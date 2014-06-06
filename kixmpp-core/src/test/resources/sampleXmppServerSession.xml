@@ -1,0 +1,23 @@
+<?xml version='1.0'?>
+<stream:stream xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' id='4235063168' from='test' version='1.0' xml:lang='en'>
+	<stream:features>
+		<starttls xmlns="urn:ietf:params:xml:ns:xmpp-tls" />
+		<compression xmlns="http://jabber.org/features/compress">
+			<method>zlib</method>
+		</compression>
+		<mechanisms xmlns="urn:ietf:params:xml:ns:xmpp-sasl" />
+	</stream:features>
+	<proceed xmlns="urn:ietf:params:xml:ns:xmpp-tls" />
+	<success xmlns="urn:ietf:params:xml:ns:xmpp-sasl" />
+	<iq xmlns="jabber:client" type="result" id="bind_1">
+		<bind xmlns="urn:ietf:params:xml:ns:xmpp-bind">
+			<jid>test@test/test</jid>
+		</bind>
+	</iq>
+	<iq type="result" id="session_1">
+		<session xmlns="urn:ietf:params:xml:ns:xmpp-session" />
+	</iq>
+	<iq from="test" type="get" to="test@test/test" id="ping_1">
+		<ping xmlns="urn:xmpp:ping" />
+	</iq>
+</stream:stream>

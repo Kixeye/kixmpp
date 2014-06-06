@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<stream:stream xmlns:stream="http://etherx.jabber.org/streams" version="1.0" xmlns="jabber:client" to="test" xml:lang="en" xmlns:xml="http://www.w3.org/XML/1998/namespace">
+	<starttls xmlns="urn:ietf:params:xml:ns:xmpp-tls" />
+	<auth xmlns="urn:ietf:params:xml:ns:xmpp-sasl" mechanism="X-YANDEX-OAUTH">
+		dGVzdABjNDE4MWE3YzJjZjQ1MjE5NjRhNzJmZjU3YTM0YTA3
+	</auth>
+	<iq type="set" id="bind_1">
+		<bind xmlns="urn:ietf:params:xml:ns:xmpp-bind">
+			<resource>test</resource>
+		</bind>
+	</iq>
+	<iq type="set" id="session_1">
+		<session xmlns="urn:ietf:params:xml:ns:xmpp-session" />
+	</iq>
+	<iq type="result" to="test" id="ping_1" />
+</stream:stream>

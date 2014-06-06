@@ -1,0 +1,157 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.kixeye.kixmpp</groupId>
+	<artifactId>kixmpp-parent</artifactId>
+	<version>1.0.0-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>KIXMPP Parent</name>
+	<description>
+        Parent for KIXMPP projects.
+    </description>
+
+	<parent>
+		<groupId>org.sonatype.oss</groupId>
+		<artifactId>oss-parent</artifactId>
+		<version>7</version>
+	</parent>
+	
+	<modules>
+		<module>kixmpp-core</module>
+	</modules>
+
+	<licenses>
+		<license>
+			<name>The Apache Software License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<name>Elvir Bahtijaragic</name>
+			<email>ebahtijaragic@kixeye.com</email>
+			<organization>KIXEYE</organization>
+			<organizationUrl>http://www.kixeye.com</organizationUrl>
+		</developer>
+		<developer>
+			<name>Chad Barry</name>
+			<email>cbarry@kixeye.com</email>
+			<organization>KIXEYE</organization>
+			<organizationUrl>http://www.kixeye.com</organizationUrl>
+		</developer>
+		<developer>
+			<name>David Turner</name>
+			<email>dturner@kixeye.com</email>
+			<organization>KIXEYE</organization>
+			<organizationUrl>http://www.kixeye.com</organizationUrl>
+		</developer>
+	</developers>
+
+	<scm>
+		<connection>scm:git:ssh://git@github.com:Kixeye/kixmpp.git</connection>
+		<developerConnection>scm:git:ssh://git@github.com:Kixeye/kixmpp.git
+        </developerConnection>
+		<url>scm:git:ssh://git@github.com:Kixeye/kixmpp.git</url>
+		<tag>HEAD</tag>
+	</scm>
+	
+	<properties>
+    	<slf4j.version>1.7.7</slf4j.version>
+		<netty.version>4.0.19.Final</netty.version>
+		
+        <!-- Plugins -->
+        <license-maven-plugin.version>1.7</license-maven-plugin.version>
+	</properties>
+
+	<build>
+		<extensions>
+			<extension>
+				<groupId>org.apache.maven.wagon</groupId>
+				<artifactId>wagon-ssh</artifactId>
+				<version>2.6</version>
+			</extension>
+		</extensions>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.1</version>
+				<configuration>
+					<source>1.7</source>
+					<target>1.7</target>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>versions-maven-plugin</artifactId>
+				<version>2.1</version>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>license-maven-plugin</artifactId>
+				<version>${license-maven-plugin.version}</version>
+				<configuration>
+					<inceptionYear>2014</inceptionYear>
+					<organizationName>KIXEYE, Inc</organizationName>
+					<projectName>KIXMPP Parent</projectName>
+					<licenseName>apache_v2</licenseName>
+					<clearAfterOperation>true</clearAfterOperation>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>process-sources</phase>
+						<goals>
+							<goal>check-file-header</goal>
+						</goals>
+						<configuration>
+							<licenseName>apache_v2</licenseName>
+							<failOnMissingHeader>true</failOnMissingHeader>
+							<roots>
+								<root>src/main/java</root>
+								<root>src/test</root>
+							</roots>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+		<pluginManagement>
+			<plugins>
+				<!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+				<plugin>
+					<groupId>org.eclipse.m2e</groupId>
+					<artifactId>lifecycle-mapping</artifactId>
+					<version>1.0.0</version>
+					<configuration>
+						<lifecycleMappingMetadata>
+							<pluginExecutions>
+								<pluginExecution>
+									<pluginExecutionFilter>
+										<groupId>
+											org.codehaus.mojo
+										</groupId>
+										<artifactId>
+											license-maven-plugin
+										</artifactId>
+										<versionRange>
+											[${license-maven-plugin.version},)
+										</versionRange>
+										<goals>
+											<goal>
+												check-file-header
+											</goal>
+										</goals>
+									</pluginExecutionFilter>
+									<action>
+										<ignore></ignore>
+									</action>
+								</pluginExecution>
+							</pluginExecutions>
+						</lifecycleMappingMetadata>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+</project>
