@@ -49,6 +49,8 @@ import com.kixeye.kixmpp.jdom.StAXElementBuilder;
  * @author ebahtijaragic
  */
 public class KixmppCodec extends ByteToMessageCodec<Object> {
+	private static final int STANZA_ELEMENT_DEPTH = 2;
+
 	private static final Logger logger  = LoggerFactory.getLogger(KixmppCodec.class);
 	
 	private StAXElementBuilder elementBuilder = null;
@@ -111,14 +113,14 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 		
 		while (isValidEvent(event = streamReader.next())) {
 			// only handle events that have element depth of 2 and above (everything under <stream:stream>..)
-			if (streamReader.getDepth() >= 2) {
+			if (streamReader.getDepth() >= STANZA_ELEMENT_DEPTH) {
 				// if this is the beginning of the element and this is at stanza depth
-				if (event == XMLStreamConstants.START_ELEMENT && streamReader.getDepth() == 2) {
+				if (event == XMLStreamConstants.START_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
 					elementBuilder = new StAXElementBuilder(true);
 					elementBuilder.process(streamReader);
 					
 				// if this is the ending of the element and this is at stanza depth
-			    } else if (event == XMLStreamConstants.END_ELEMENT && streamReader.getDepth() == 2) {
+			    } else if (event == XMLStreamConstants.END_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
 					elementBuilder.process(streamReader);
 					
 					// get the constructed element
@@ -128,7 +130,7 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 						logger.debug("Received Stanza: [{}]", new XMLOutputter().outputString(element));
 					}
 					
-		    		out.add(element);;
+		    		out.add(element);
 		    
 		    	// just process the event
 			    } else {
