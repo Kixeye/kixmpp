@@ -94,7 +94,7 @@
 				<configuration>
 					<inceptionYear>2014</inceptionYear>
 					<organizationName>KIXEYE, Inc</organizationName>
-					<projectName>KIXMPP Parent</projectName>
+					<projectName>KIXMPP</projectName>
 					<licenseName>apache_v2</licenseName>
 					<clearAfterOperation>true</clearAfterOperation>
 				</configuration>
