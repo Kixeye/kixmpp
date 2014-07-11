@@ -28,6 +28,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -39,6 +40,8 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -66,7 +69,7 @@ import reactor.tuple.Tuple;
 import com.kixeye.kixmpp.KixmppCodec;
 
 /**
- * A KIXMPP client.
+ * A XMPP client.
  * 
  * @author ebahtijaragic
  */
@@ -84,6 +87,9 @@ public class KixmppClient implements AutoCloseable {
 	private final ConcurrentLinkedQueue<Registration<?>> consumerRegistrations = new ConcurrentLinkedQueue<>();
 
 	private final SslContext sslContext;
+	
+	private final Set<KixmppStanzaInterceptor> incomingStanzaInterceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
+	private final Set<KixmppStanzaInterceptor> outgoingStanzaInterceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
 	
 	private Deferred<KixmppClient, Promise<KixmppClient>> deferredLogin;
 	
@@ -276,6 +282,42 @@ public class KixmppClient implements AutoCloseable {
     public <T> KixmppClient channelOption(ChannelOption<T> option, T value) {
     	bootstrap.option(option, value);
     	return this;
+    }
+    
+    /**
+     * Adds an incoming stanza interceptor.
+     * 
+     * @param interceptor
+     */
+    public boolean addIncomingStanzaInterceptor(KixmppStanzaInterceptor interceptor) {
+    	return incomingStanzaInterceptors.add(interceptor);
+    }
+    
+    /**
+     * Removes an incoming stanza interceptor.
+     * 
+     * @param interceptor
+     */
+    public boolean removeIncomingStanzaInterceptor(KixmppStanzaInterceptor interceptor) {
+    	return incomingStanzaInterceptors.remove(interceptor);
+    }
+    
+    /**
+     * Adds an outgoing stanza interceptor.
+     * 
+     * @param interceptor
+     */
+    public boolean addOutgoingStanzaInterceptor(KixmppStanzaInterceptor interceptor) {
+    	return outgoingStanzaInterceptors.add(interceptor);
+    }
+    
+    /**
+     * Removes an outgoing stanza interceptor.
+     * 
+     * @param interceptor
+     */
+    public boolean removeOutgoingStanzaInterceptor(KixmppStanzaInterceptor interceptor) {
+    	return outgoingStanzaInterceptors.remove(interceptor);
     }
     
     /**
@@ -521,8 +563,31 @@ public class KixmppClient implements AutoCloseable {
 		@Override
 		public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 			Element stanza = (Element)msg;
+			
+			for (KixmppStanzaInterceptor interceptor : incomingStanzaInterceptors) {
+				try {
+					interceptor.interceptStanza((Element)msg);
+				} catch (Exception e) {
+					logger.error("Incomming stanza interceptor [{}] threw an exception.", interceptor, e);
+				}
+			}
 
 			reactor.notify(Tuple.of(clientId, stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(stanza));
+		}
+		
+		@Override
+		public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+			if (msg instanceof Element) {
+				for (KixmppStanzaInterceptor interceptor : outgoingStanzaInterceptors) {
+					try {
+						interceptor.interceptStanza((Element)msg);
+					} catch (Exception e) {
+						logger.error("Outgoing stanza interceptor [{}] threw an exception.", interceptor, e);
+					}
+				}
+			}
+			
+			super.write(ctx, msg, promise);
 		}
 		
 		@Override
