@@ -1,0 +1,133 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<artifactId>kixmpp-client</artifactId>
+	<name>KIXMPP Core</name>
+	<description>
+        A XMPP Client.
+    </description>
+
+	<parent>
+		<groupId>com.kixeye.kixmpp</groupId>
+		<artifactId>kixmpp-parent</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+	</parent>
+
+	<developers>
+		<developer>
+			<name>Elvir Bahtijaragic</name>
+			<email>ebahtijaragic@kixeye.com</email>
+			<organization>KIXEYE</organization>
+			<organizationUrl>http://www.kixeye.com</organizationUrl>
+		</developer>
+		<developer>
+			<name>Chad Barry</name>
+			<email>cbarry@kixeye.com</email>
+			<organization>KIXEYE</organization>
+			<organizationUrl>http://www.kixeye.com</organizationUrl>
+		</developer>
+		<developer>
+			<name>David Turner</name>
+			<email>dturner@kixeye.com</email>
+			<organization>KIXEYE</organization>
+			<organizationUrl>http://www.kixeye.com</organizationUrl>
+		</developer>
+	</developers>
+
+	<properties>
+		<reactor.version>1.1.3.RELEASE</reactor.version>
+	</properties>
+
+	<dependencies>
+		<!-- KIXMPP -->
+		<dependency>
+			<groupId>${parent.groupId}</groupId>
+			<artifactId>kixmpp-core</artifactId>
+			<version>${parent.version}</version>
+		</dependency>
+
+		<!-- Reactor -->
+		<dependency>
+			<groupId>org.projectreactor</groupId>
+			<artifactId>reactor-core</artifactId>
+			<version>${reactor.version}</version>
+		</dependency>
+
+		<!-- Netty -->
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-codec</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-transport</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-buffer</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-common</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-common</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-handler</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+
+		<!-- Logging -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+
+		<!-- Testing -->
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.11</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.hamcrest</groupId>
+			<artifactId>hamcrest-core</artifactId>
+			<version>1.3</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>${slf4j.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.vysper</groupId>
+			<artifactId>vysper-core</artifactId>
+			<version>0.7</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.directory.studio</groupId>
+			<artifactId>org.apache.commons.io</artifactId>
+			<version>2.4</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>commons-codec</groupId>
+			<artifactId>commons-codec</artifactId>
+			<version>1.9</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

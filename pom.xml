@@ -18,6 +18,7 @@
 	
 	<modules>
 		<module>kixmpp-core</module>
+		<module>kixmpp-client</module>
 	</modules>
 
 	<licenses>
@@ -58,7 +59,7 @@
 	
 	<properties>
     	<slf4j.version>1.7.7</slf4j.version>
-		<netty.version>4.0.19.Final</netty.version>
+		<netty.version>4.0.21.Final</netty.version>
 		
         <!-- Plugins -->
         <license-maven-plugin.version>1.7</license-maven-plugin.version>
@@ -94,7 +95,7 @@
 				<configuration>
 					<inceptionYear>2014</inceptionYear>
 					<organizationName>KIXEYE, Inc</organizationName>
-					<projectName>KIXMPP Parent</projectName>
+					<projectName>KIXMPP</projectName>
 					<licenseName>apache_v2</licenseName>
 					<clearAfterOperation>true</clearAfterOperation>
 				</configuration>
