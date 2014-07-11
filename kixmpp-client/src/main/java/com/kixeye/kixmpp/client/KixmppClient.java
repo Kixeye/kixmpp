@@ -12,8 +12,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.base64.Base64;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.Future;
@@ -326,7 +324,9 @@ public class KixmppClient implements AutoCloseable {
 			
 			Element startTls = features.getChild("starttls", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-tls"));
 			
-			if (startTls != null && startTls.getChild("required", startTls.getNamespace()) != null) {
+			Object enableTls = clientOptions.get(KixmppClientOption.ENABLE_TLS);
+			
+			if ((enableTls != null && (boolean)enableTls) || (startTls != null && startTls.getChild("required", startTls.getNamespace()) != null)) {
 				// if its required, always do tls
 				startTls = new Element("starttls", "tls", "urn:ietf:params:xml:ns:xmpp-tls");
 				
@@ -355,7 +355,8 @@ public class KixmppClient implements AutoCloseable {
 						}
 					}
 				});
-				channel.get().pipeline().addAfter("loggingHandler", "sslHandler", handler);
+				
+				channel.get().pipeline().addFirst("sslHandler", handler);
 			}
 		}
 	};
@@ -405,7 +406,7 @@ public class KixmppClient implements AutoCloseable {
 				Element bind = iqResponse.getChild("bind", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
 				
 				if (bind != null) {
-					jid = bind.getChildText("jid");
+					jid = bind.getChildText("jid", bind.getNamespace());
 				}
 
 				// start the session
@@ -437,6 +438,8 @@ public class KixmppClient implements AutoCloseable {
 			if (typeAttribute != null && "result".equals(typeAttribute.getValue())) {
 				deferredLogin.accept(KixmppClient.this);
 				state.set(State.LOGGED_IN);
+				
+				logger.debug("Logged in as: " + jid);
 
 				// no need to keep reference around
 				deferredLogin = null;
@@ -483,8 +486,6 @@ public class KixmppClient implements AutoCloseable {
 		 */
 		protected void initChannel(SocketChannel ch) throws Exception {
 			// initially only add the codec and out client handler
-			ch.pipeline().addLast("loggingHandler", new LoggingHandler(LogLevel.DEBUG));
-			ch.pipeline().addLast("secondLoggingHandler", new LoggingHandler(LogLevel.DEBUG));
 			ch.pipeline().addLast("kixmppCodec", new KixmppCodec());
 			ch.pipeline().addLast("kixmppClientMessageHandler", new KixmppClientMessageHandler());
 		}
@@ -500,8 +501,6 @@ public class KixmppClient implements AutoCloseable {
 		public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 			Element stanza = (Element)msg;
 
-			System.out.println(stanza.getName());
-			
 			reactor.notify(Tuple.of(clientId, stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(stanza));
 		}
 		
