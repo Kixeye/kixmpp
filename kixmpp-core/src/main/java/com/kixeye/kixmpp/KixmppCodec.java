@@ -104,11 +104,15 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 	 */
 	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Received: [{}]", in.toString(StandardCharsets.UTF_8));
+		}
+		
 		// feed the data into the async xml input feeded
 		byte[] data = new byte[in.readableBytes()];
 		in.readBytes(data);
 		asyncInputFeeder.feedInput(data, 0, data.length);
-		
+
 		int event = -1;
 		
 		while (isValidEvent(event = streamReader.next())) {
@@ -126,10 +130,6 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 					// get the constructed element
 					Element element = elementBuilder.getElement();
 
-					if (logger.isDebugEnabled()) {
-						logger.debug("Received Stanza: [{}]", new XMLOutputter().outputString(element));
-					}
-					
 		    		out.add(element);
 		    
 		    	// just process the event
@@ -164,7 +164,7 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 		}
 		
 		if (logger.isDebugEnabled()) {
-			logger.debug("Sending Stanza: [{}]", out.toString(StandardCharsets.UTF_8));
+			logger.debug("Sending: [{}]", out.toString(StandardCharsets.UTF_8));
 		}
 	}
 	
