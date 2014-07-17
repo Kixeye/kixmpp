@@ -121,7 +121,14 @@ public class KixmppClientTest {
 	
 	@Test
 	public void testSimpleConnect() throws Exception {
-	    Certificate cert;
+		try (KixmppClient client = new KixmppClient(createSslContext())) {
+			Assert.assertNotNull(client.connect("localhost", port, domain).await(2, TimeUnit.SECONDS));
+			Assert.assertNotNull(client.login(username, password, resource).await(2, TimeUnit.SECONDS));
+		}
+	}
+
+	private SslContext createSslContext() throws Exception {
+		Certificate cert;
 	    
 		try (InputStream certStream = this.getClass().getResourceAsStream("/bogus_mina_tls.cert")) {
 			KeyStore ks = KeyStore.getInstance("JKS");
@@ -136,9 +143,6 @@ public class KixmppClientTest {
 		IOUtils.copy(new StringReader("\n-----END CERTIFICATE-----"), certFileOutputStream);
 		certFileOutputStream.close();
 		
-		try (KixmppClient client = new KixmppClient(SslContext.newClientContext(certFile))) {
-			Assert.assertNotNull(client.connect("localhost", port, domain).await(2, TimeUnit.SECONDS));
-			Assert.assertNotNull(client.login(username, password, resource).await(2, TimeUnit.SECONDS));
-		}
+		return SslContext.newClientContext(certFile);
 	}
 }

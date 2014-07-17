@@ -41,6 +41,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -67,6 +68,9 @@ import reactor.function.Consumer;
 import reactor.tuple.Tuple;
 
 import com.kixeye.kixmpp.KixmppCodec;
+import com.kixeye.kixmpp.client.module.KixmppModule;
+import com.kixeye.kixmpp.client.module.muc.MucKixmppModule;
+import com.kixeye.kixmpp.client.module.presence.PresenceKixmppModule;
 
 /**
  * A XMPP client.
@@ -81,6 +85,8 @@ public class KixmppClient implements AutoCloseable {
     private final ConcurrentHashMap<KixmppClientOption<?>, Object> clientOptions = new ConcurrentHashMap<KixmppClientOption<?>, Object>();
 	private final Bootstrap bootstrap;
 	
+	private final KixmppStanzaHandlerRegistry handlerRegistry;
+	
 	private final Environment environment;
 	private final Reactor reactor;
 	
@@ -90,6 +96,9 @@ public class KixmppClient implements AutoCloseable {
 	
 	private final Set<KixmppStanzaInterceptor> incomingStanzaInterceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
 	private final Set<KixmppStanzaInterceptor> outgoingStanzaInterceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
+
+	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+	private final ConcurrentHashMap<String, KixmppModule> modules = new ConcurrentHashMap<>();
 	
 	private Deferred<KixmppClient, Promise<KixmppClient>> deferredLogin;
 	
@@ -133,16 +142,7 @@ public class KixmppClient implements AutoCloseable {
 	 * @param sslContext
 	 */
 	public KixmppClient(EventLoopGroup eventLoopGroup, Environment environment, String dispatcher, SslContext sslContext) {
-		bootstrap = new Bootstrap()
-			.group(eventLoopGroup)
-			.channel(NioSocketChannel.class)
-			.option(ChannelOption.TCP_NODELAY, false)
-			.option(ChannelOption.SO_KEEPALIVE, true)
-			.handler(new KixmppClientChannelInitializer());
-		
-		this.environment = environment;
-		this.reactor = Reactors.reactor(environment, dispatcher);
-		this.sslContext = sslContext;
+		this(eventLoopGroup, environment, Reactors.reactor(environment, dispatcher), sslContext);
 	}
 	
 	/**
@@ -164,6 +164,11 @@ public class KixmppClient implements AutoCloseable {
 		this.environment = environment;
 		this.reactor = reactor;
 		this.sslContext = sslContext;
+		this.handlerRegistry = new KixmppStanzaHandlerRegistry(clientId, reactor);
+		
+		// set modules to be registered
+		this.modulesToRegister.add(MucKixmppModule.class.getName());
+		this.modulesToRegister.add(PresenceKixmppModule.class.getName());
 	}
 	
 	/**
@@ -172,12 +177,12 @@ public class KixmppClient implements AutoCloseable {
 	 * @param hostname
 	 * @param port
 	 */
-	public Promise<KixmppClient> connect(String hostname, int port,  String domain) {
-		checkAndSetState(State.DISCONNECTED, State.CONNECTING);
+	public Promise<KixmppClient> connect(String hostname, int port, String domain) {
+		checkAndSetState(State.CONNECTING, State.DISCONNECTED);
 		
 		this.domain = domain;
 		
-		registerConsumers();
+		setUp();
 		
 		final Deferred<KixmppClient, Promise<KixmppClient>> deferred = Promises.defer(environment, Environment.WORK_QUEUE);
 		
@@ -207,7 +212,7 @@ public class KixmppClient implements AutoCloseable {
 	 * @throws InterruptedException 
 	 */
 	public Promise<KixmppClient> login(String username, String password, String resource) throws InterruptedException {
-		checkAndSetState(State.CONNECTED, State.LOGGING_IN);
+		checkAndSetState(State.LOGGING_IN, State.CONNECTED);
 		
 		this.username = username;
 		this.password = password;
@@ -228,7 +233,7 @@ public class KixmppClient implements AutoCloseable {
 		
 		if (previousState != State.DISCONNECTING) {
 			try {
-				unregisterConsumers();
+				cleanUp();
 				
 				try {
 					ChannelFuture currentFuture = future.get();
@@ -321,23 +326,86 @@ public class KixmppClient implements AutoCloseable {
     }
     
     /**
-     * Checks the state and sets it.
+     * Gets the handler registry.
      * 
-     * @param expected
-     * @param update
-     * @throws IllegalStateException
+     * @return
      */
-    private void checkAndSetState(State expected, State update) throws IllegalStateException {
-    	if (!state.compareAndSet(expected, update)) {
-			throw new IllegalStateException(String.format("The current state is [%s] but must be [%s]", state.get(), expected));
-		}
+    public KixmppStanzaHandlerRegistry getHandlerRegistry() {
+    	return handlerRegistry;
     }
     
     /**
-     * Registers all the consumers.
+     * @param moduleClass
+     * @return true if module is installed
      */
-    private void registerConsumers() {
+    public boolean hasActiveModule(Class<?> moduleClass) {
+    	return modules.containsKey(moduleClass.getName());
+    }
+    
+    /**
+     * Gets or installs a module.
+     * 
+     * @param moduleClass
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+	public <T extends KixmppModule> T module(Class<T> moduleClass) {
+    	if (!(state.get() == State.CONNECTED || state.get() == State.LOGGED_IN)) {
+			throw new IllegalStateException(String.format("The current state is [%s] but must be [CONNECTED or LOGGED_IN]", state.get()));
+    	}
+    	
+    	T module = (T)modules.get(moduleClass.getName());
+    	
+    	if (module == null) {
+    		module = (T)installModule(moduleClass.getName());
+    	}
+
+    	return module;
+    }
+    
+    /**
+     * Writes a stanza to the channel.
+     * 
+     * @param element
+     */
+    public void sendStanza(Element element) {
+    	channel.get().writeAndFlush(element);
+    }
+    
+    /**
+     * Checks the state and sets it.
+     * 
+     * @param update
+     * @param expectedStates
+     * @throws IllegalStateException
+     */
+    private void checkAndSetState(State update, State... expectedStates) throws IllegalStateException {
+    	if (expectedStates != null) {
+    		boolean wasSet = false;
+    		
+    		for (State expectedState : expectedStates) {
+    			if (state.compareAndSet(expectedState, update)) {
+    				wasSet = true;
+    				break;
+    			}
+    		}
+    		
+    		if (!wasSet) {
+    			throw new IllegalStateException(String.format("The current state is [%s] but must be [%s]", state.get(), expectedStates));
+    		}
+    	} else {
+    		if (!state.compareAndSet(null, update)) {
+    			throw new IllegalStateException(String.format("The current state is [%s] but must be [null]", state.get()));
+			}
+    	}
+    }
+    
+    /**
+     * Registers all the consumers and modules.
+     */
+    private void setUp() {
     	if (state.get() == State.CONNECTING) {
+    		// this client deals with the following stanzas
     		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "stream:features", "http://etherx.jabber.org/streams")), streamFeaturesConsumer));
 
     		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "proceed", "urn:ietf:params:xml:ns:xmpp-tls")), tlsResponseConsumer));
@@ -349,20 +417,52 @@ public class KixmppClient implements AutoCloseable {
     		
     		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "bind")), iqBindResultConsumer));
     		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "session")), iqSessionResultConsumer));
+    		
+    		// register all modules
+    		for (String moduleClassName : modulesToRegister) {
+    			installModule(moduleClassName);
+    		}
     	}
     }
     
     /**
-     * Unregisters all consumers.
+     * Unregisters all consumers and modules.
      */
-    private void unregisterConsumers() {
+    private void cleanUp() {
     	if (state.get() == State.DISCONNECTING) {
     		Registration<?> registration = null;
     		
     		while ((registration = consumerRegistrations.poll()) != null) {
     			registration.cancel();
     		}
+    		
+    		for (Entry<String, KixmppModule> entry : modules.entrySet()) {
+    			entry.getValue().uninstall(this);
+    		}
+    		
+    		handlerRegistry.unregisterAll();
     	}
+    }
+    
+    /**
+     * Tries to install module.
+     * 
+     * @param moduleClassName
+     * @throws Exception
+     */
+    private KixmppModule installModule(String moduleClassName) {
+    	KixmppModule module = null;
+		
+		try {
+			module = (KixmppModule)Class.forName(moduleClassName).newInstance();
+			module.install(this);
+			
+			modules.put(moduleClassName, module);
+		} catch (Exception e) {
+			logger.error("Error while installing module", e);
+		}
+		
+		return module;
     }
     
     /**
@@ -503,13 +603,13 @@ public class KixmppClient implements AutoCloseable {
 				state.set(State.LOGGED_IN);
 				
 				logger.debug("Logged in as: " + jid);
-
-				// no need to keep reference around
-				deferredLogin = null;
 			} else {
 				// fail
 				deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(iqResponse)));
 			}
+
+			// no need to keep reference around
+			deferredLogin = null;
 		}
 	};
 	
