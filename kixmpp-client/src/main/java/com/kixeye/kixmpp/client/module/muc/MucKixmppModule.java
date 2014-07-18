@@ -118,6 +118,10 @@ public class MucKixmppModule implements KixmppModule {
 		Element x = new Element("x", "http://jabber.org/protocol/muc");
 		presence.addContent(x);
 		
+		Element history = new Element("history");
+		history.setAttribute("maxstanzas", "0");
+		x.addContent(history);
+		
 		client.sendStanza(presence);
 	}
 	

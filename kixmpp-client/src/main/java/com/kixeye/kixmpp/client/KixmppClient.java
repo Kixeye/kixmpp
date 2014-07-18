@@ -22,6 +22,7 @@ package com.kixeye.kixmpp.client;
 
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFuture;
@@ -101,6 +102,7 @@ public class KixmppClient implements AutoCloseable {
 	private final ConcurrentHashMap<String, KixmppModule> modules = new ConcurrentHashMap<>();
 	
 	private Deferred<KixmppClient, Promise<KixmppClient>> deferredLogin;
+	private Deferred<KixmppClient, Promise<KixmppClient>> deferredDisconnect;
 	
 	private String username;
 	private String password;
@@ -233,11 +235,13 @@ public class KixmppClient implements AutoCloseable {
 			deferred.accept(this);
 			
 			return deferred.compose();
+		} else if (state.get() == State.DISCONNECTING) {
+			return deferredDisconnect.compose();
 		}
 		
 		checkAndSetState(State.DISCONNECTING, State.CONNECTED, State.LOGGED_IN, State.LOGGING_IN);
 
-		final Deferred<KixmppClient, Promise<KixmppClient>> deferred = Promises.defer(environment, Environment.WORK_QUEUE);
+		deferredDisconnect = Promises.defer(environment, Environment.WORK_QUEUE);
 		
 		cleanUp();
 		
@@ -248,17 +252,17 @@ public class KixmppClient implements AutoCloseable {
 				public void operationComplete(Future<? super Void> arg0) throws Exception {
 					currentChannel.close().addListener(new GenericFutureListener<Future<? super Void>>() {
 						public void operationComplete(Future<? super Void> arg0) throws Exception {
-							deferred.accept(KixmppClient.this);
+							deferredDisconnect.accept(KixmppClient.this);
 							state.set(State.DISCONNECTED);
 						}
 					});
 				}
 			});
 		} else {
-			deferred.accept(new KixmppException("No channel available to close."));
+			deferredDisconnect.accept(new KixmppException("No channel available to close."));
 		}
 
-		return deferred.compose();
+		return deferredDisconnect.compose();
 	}
 
 	/**
@@ -480,7 +484,12 @@ public class KixmppClient implements AutoCloseable {
 		
 		Element auth = new Element("auth", "urn:ietf:params:xml:ns:xmpp-sasl");
 		auth.setAttribute("mechanism", "PLAIN");
-		auth.setText(Base64.encode(channel.get().alloc().buffer().writeBytes(authToken)).toString(StandardCharsets.UTF_8));
+		
+		ByteBuf encodedCredentials = Base64.encode(channel.get().alloc().buffer().writeBytes(authToken));
+		String encodedCredentialsString = encodedCredentials.toString(StandardCharsets.UTF_8);
+		encodedCredentials.release();
+		
+		auth.setText(encodedCredentialsString);
 		
 		channel.get().writeAndFlush(auth);
     }
