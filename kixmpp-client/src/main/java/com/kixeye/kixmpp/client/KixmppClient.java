@@ -108,7 +108,6 @@ public class KixmppClient implements AutoCloseable {
 	private String domain;
 	private String jid;
 	
-	private AtomicReference<ChannelFuture> future = new AtomicReference<>(null);
 	private AtomicReference<Channel> channel = new AtomicReference<>(null);
 	
 	private AtomicReference<State> state = new AtomicReference<>(State.DISCONNECTED);
@@ -228,30 +227,38 @@ public class KixmppClient implements AutoCloseable {
 	/**
 	 * Disconnects from the current server.
 	 */ 
-	public void disconnect() {
-		State previousState = state.getAndSet(State.DISCONNECTING);
-		
-		if (previousState != State.DISCONNECTING) {
-			try {
-				cleanUp();
-				
-				try {
-					ChannelFuture currentFuture = future.get();
-					
-					if (currentFuture != null) {
-						currentFuture.cancel(false);
-					}
-				} finally {
-					Channel currentChannel = channel.get();
-					
-					if (currentChannel != null) {
-						currentChannel.close();
-					}
-				}
-			} finally {
-				state.set(State.DISCONNECTED);
-			}
+	public Promise<KixmppClient> disconnect() {
+		if (state.get() == State.DISCONNECTED) {
+			final Deferred<KixmppClient, Promise<KixmppClient>> deferred = Promises.defer(environment, Environment.WORK_QUEUE);
+			deferred.accept(this);
+			
+			return deferred.compose();
 		}
+		
+		checkAndSetState(State.DISCONNECTING, State.CONNECTED, State.LOGGED_IN, State.LOGGING_IN);
+
+		final Deferred<KixmppClient, Promise<KixmppClient>> deferred = Promises.defer(environment, Environment.WORK_QUEUE);
+		
+		cleanUp();
+		
+		final Channel currentChannel = channel.get();
+
+		if (currentChannel != null) {
+			KixmppCodec.sendXmppStreamRootStop(channel.get()).addListener(new GenericFutureListener<Future<? super Void>>() {
+				public void operationComplete(Future<? super Void> arg0) throws Exception {
+					currentChannel.close().addListener(new GenericFutureListener<Future<? super Void>>() {
+						public void operationComplete(Future<? super Void> arg0) throws Exception {
+							deferred.accept(KixmppClient.this);
+							state.set(State.DISCONNECTED);
+						}
+					});
+				}
+			});
+		} else {
+			deferred.accept(new KixmppException("No channel available to close."));
+		}
+
+		return deferred.compose();
 	}
 
 	/**
