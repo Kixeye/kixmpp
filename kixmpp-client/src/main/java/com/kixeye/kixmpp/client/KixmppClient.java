@@ -485,9 +485,11 @@ public class KixmppClient implements AutoCloseable {
 		Element auth = new Element("auth", "urn:ietf:params:xml:ns:xmpp-sasl");
 		auth.setAttribute("mechanism", "PLAIN");
 		
-		ByteBuf encodedCredentials = Base64.encode(channel.get().alloc().buffer().writeBytes(authToken));
+		ByteBuf rawCredentials = channel.get().alloc().buffer().writeBytes(authToken);
+		ByteBuf encodedCredentials = Base64.encode(rawCredentials);
 		String encodedCredentialsString = encodedCredentials.toString(StandardCharsets.UTF_8);
 		encodedCredentials.release();
+		rawCredentials.release();
 		
 		auth.setText(encodedCredentialsString);
 		
