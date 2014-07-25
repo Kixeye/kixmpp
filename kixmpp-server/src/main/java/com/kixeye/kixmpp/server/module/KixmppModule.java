@@ -1,5 +1,9 @@
 package com.kixeye.kixmpp.server.module;
 
+import java.util.List;
+
+import org.jdom2.Element;
+
 import com.kixeye.kixmpp.server.KixmppServer;
 
 /*
@@ -42,4 +46,11 @@ public interface KixmppModule {
 	 * @param client
 	 */
 	public void uninstall(KixmppServer client);
+	
+	/**
+	 * Gets a list of features added by this module.
+	 * 
+	 * @return
+	 */
+	public List<Element> getFeatures();
 }
