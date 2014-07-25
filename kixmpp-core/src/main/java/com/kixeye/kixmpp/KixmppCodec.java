@@ -52,6 +52,8 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 	private static final int STANZA_ELEMENT_DEPTH = 2;
 
 	private static final Logger logger  = LoggerFactory.getLogger(KixmppCodec.class);
+
+	private StAXElementBuilder streamElementBuilder = null;
 	
 	private StAXElementBuilder elementBuilder = null;
 	
@@ -97,6 +99,8 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 				inputFactory.configureForXmlConformance();
 				break;
 		}
+		
+		this.streamElementBuilder = new StAXElementBuilder(true);
 	}
 	
 	/**
@@ -116,8 +120,22 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 		int event = -1;
 		
 		while (isValidEvent(event = streamReader.next())) {
+			// handle stream start/end
+			if (streamReader.getDepth() == STANZA_ELEMENT_DEPTH - 1) {
+				if (event == XMLStreamConstants.END_ELEMENT) {
+					out.add(new KixmppStreamEnd());
+				} else if (streamElementBuilder != null) {
+					streamElementBuilder.process(streamReader);
+				}
 			// only handle events that have element depth of 2 and above (everything under <stream:stream>..)
-			if (streamReader.getDepth() >= STANZA_ELEMENT_DEPTH) {
+			} else if (streamReader.getDepth() >= STANZA_ELEMENT_DEPTH) {
+				// check if stream was published
+				if (streamElementBuilder != null) {
+					out.add(new KixmppStreamStart(streamElementBuilder.getElement()));
+					
+					streamElementBuilder = null;
+				}
+				
 				// if this is the beginning of the element and this is at stanza depth
 				if (event == XMLStreamConstants.START_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
 					elementBuilder = new StAXElementBuilder(true);
@@ -172,15 +190,19 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 	 * Sends the room XML element for starting a XMPP session.
 	 * 
 	 * @param channel
-	 * @param domain
+	 * @param from
+	 * @param to
 	 */
-	public static final ChannelFuture sendXmppStreamRootStart(Channel channel, String domain) {
+	public static final ChannelFuture sendXmppStreamRootStart(Channel channel, String from, String to) {
 		ByteBuf buffer = channel.alloc().buffer();
 		
 		buffer.writeBytes("<?xml version='1.0' encoding='UTF-8'?>".getBytes(StandardCharsets.UTF_8));
 		buffer.writeBytes("<stream:stream ".getBytes(StandardCharsets.UTF_8));
-		if (domain != null) {
-			buffer.writeBytes(String.format("to=\"%s\" ", domain).getBytes(StandardCharsets.UTF_8));
+		if (from != null) {
+			buffer.writeBytes(String.format("from=\"%s\" ", from).getBytes(StandardCharsets.UTF_8));
+		}
+		if (to != null) {
+			buffer.writeBytes(String.format("to=\"%s\" ", to).getBytes(StandardCharsets.UTF_8));
 		}
 		buffer.writeBytes("version=\"1.0\" xmlns=\"jabber:client\" xmlns:stream=\"http://etherx.jabber.org/streams\">".getBytes(StandardCharsets.UTF_8));
 		

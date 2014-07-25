@@ -27,8 +27,10 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.jdom2.Element;
 import org.junit.Assert;
@@ -41,13 +43,21 @@ import org.junit.Test;
  */
 public class KixmppCodecTest {
 	@Test
-	public void testSampleXmppClientSession() throws Exception {
+	public void testSampleXmppClientSessionPerLine() throws Exception {
+		final AtomicReference<KixmppStreamStart> start = new AtomicReference<>();
+		final AtomicReference<KixmppStreamEnd> end = new AtomicReference<>();
 		final ArrayList<Element> elements = new ArrayList<>();
 		
 		ChannelInboundHandlerAdapter handler = new ChannelInboundHandlerAdapter() {
 			@Override
 			public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-				elements.add((Element)msg);
+				if (msg instanceof KixmppStreamStart) {
+					start.set((KixmppStreamStart)msg);
+				} else if (msg instanceof KixmppStreamEnd) {
+					end.set((KixmppStreamEnd)msg);
+				} else if (msg instanceof Element) {
+					elements.add((Element)msg);
+				}
 			}
 		};
 		
@@ -65,6 +75,61 @@ public class KixmppCodecTest {
 			}
 		}
 		
+		Assert.assertNotNull(start.get());
+		Assert.assertNotNull(end.get());
+		
+		Assert.assertEquals(5, elements.size());
+
+		Assert.assertEquals("starttls", elements.get(0).getName());
+		Assert.assertEquals("auth", elements.get(1).getName());
+		Assert.assertEquals("iq", elements.get(2).getName());
+		Assert.assertEquals("iq", elements.get(3).getName());
+		Assert.assertEquals("iq", elements.get(4).getName());
+	}
+	
+	@Test
+	public void testSampleXmppClientSessionPer100Chars() throws Exception {
+		final AtomicReference<KixmppStreamStart> start = new AtomicReference<>();
+		final AtomicReference<KixmppStreamEnd> end = new AtomicReference<>();
+		final ArrayList<Element> elements = new ArrayList<>();
+		
+		ChannelInboundHandlerAdapter handler = new ChannelInboundHandlerAdapter() {
+			@Override
+			public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+				if (msg instanceof KixmppStreamStart) {
+					start.set((KixmppStreamStart)msg);
+				} else if (msg instanceof KixmppStreamEnd) {
+					end.set((KixmppStreamEnd)msg);
+				} else if (msg instanceof Element) {
+					elements.add((Element)msg);
+				}
+			}
+		};
+		
+		EmbeddedChannel channel = new EmbeddedChannel(
+				new KixmppCodec(),
+				handler);
+		
+		// write a packer per line
+		try (InputStream inputStream = this.getClass().getResourceAsStream("/sampleXmppClientSession.xml")) {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+			
+			int charsRead = 0;
+			char[] chars = new char[100];
+			while ((charsRead = reader.read(chars)) != -1) {
+				StringWriter writer = new StringWriter();
+				
+				for (int i = 0; i < charsRead; i++) {
+					writer.append(chars[i]);
+				}
+				
+				channel.writeInbound(channel.alloc().buffer().writeBytes(writer.toString().getBytes(StandardCharsets.UTF_8)));
+			}
+		}
+		
+		Assert.assertNotNull(start.get());
+		Assert.assertNotNull(end.get());
+		
 		Assert.assertEquals(5, elements.size());
 
 		Assert.assertEquals("starttls", elements.get(0).getName());
@@ -76,12 +141,20 @@ public class KixmppCodecTest {
 	
 	@Test
 	public void testSampleXmppServerSession() throws Exception {
+		final AtomicReference<KixmppStreamStart> start = new AtomicReference<>();
+		final AtomicReference<KixmppStreamEnd> end = new AtomicReference<>();
 		final ArrayList<Element> elements = new ArrayList<>();
 		
 		ChannelInboundHandlerAdapter handler = new ChannelInboundHandlerAdapter() {
 			@Override
 			public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-				elements.add((Element)msg);
+				if (msg instanceof KixmppStreamStart) {
+					start.set((KixmppStreamStart)msg);
+				} else if (msg instanceof KixmppStreamEnd) {
+					end.set((KixmppStreamEnd)msg);
+				} else if (msg instanceof Element) {
+					elements.add((Element)msg);
+				}
 			}
 		};
 		
@@ -98,6 +171,9 @@ public class KixmppCodecTest {
 				channel.writeInbound(channel.alloc().buffer().writeBytes(line.getBytes(StandardCharsets.UTF_8)));
 			}
 		}
+
+		Assert.assertNotNull(start.get());
+		Assert.assertNotNull(end.get());
 		
 		Assert.assertEquals(6, elements.size());
 

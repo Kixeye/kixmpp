@@ -185,7 +185,7 @@ public class KixmppClient implements AutoCloseable {
 		
 		setUp();
 		
-		final Deferred<KixmppClient, Promise<KixmppClient>> deferred = Promises.defer(environment, Environment.WORK_QUEUE);
+		final Deferred<KixmppClient, Promise<KixmppClient>> deferred = Promises.defer(environment, reactor.getDispatcher());
 		
 		bootstrap.connect(hostname, port).addListener(new GenericFutureListener<Future<? super Void>>() {
 			public void operationComplete(Future<? super Void> future) throws Exception {
@@ -219,9 +219,9 @@ public class KixmppClient implements AutoCloseable {
 		this.password = password;
 		this.resource = resource;
 
-		deferredLogin = Promises.defer(environment, Environment.WORK_QUEUE);
+		deferredLogin = Promises.defer(environment, reactor.getDispatcher());
 		
-		KixmppCodec.sendXmppStreamRootStart(channel.get(), domain);
+		KixmppCodec.sendXmppStreamRootStart(channel.get(), null, domain);
 		
 		return deferredLogin.compose();
 	}
@@ -241,7 +241,7 @@ public class KixmppClient implements AutoCloseable {
 		
 		checkAndSetState(State.DISCONNECTING, State.CONNECTED, State.LOGGED_IN, State.LOGGING_IN);
 
-		deferredDisconnect = Promises.defer(environment, Environment.WORK_QUEUE);
+		deferredDisconnect = Promises.defer(environment, reactor.getDispatcher());
 		
 		cleanUp();
 		
@@ -530,7 +530,7 @@ public class KixmppClient implements AutoCloseable {
 						if (future.isSuccess()) {
 							channel.get().pipeline().replace(KixmppCodec.class, "kixmppCodec", new KixmppCodec());
 							
-							KixmppCodec.sendXmppStreamRootStart(channel.get(), domain);
+							KixmppCodec.sendXmppStreamRootStart(channel.get(), null, domain);
 						} else {
 							deferredLogin.accept(new KixmppAuthException("tls failed"));
 						}
@@ -680,17 +680,19 @@ public class KixmppClient implements AutoCloseable {
 	private final class KixmppClientMessageHandler extends ChannelDuplexHandler {
 		@Override
 		public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-			Element stanza = (Element)msg;
-			
-			for (KixmppStanzaInterceptor interceptor : incomingStanzaInterceptors) {
-				try {
-					interceptor.interceptStanza((Element)msg);
-				} catch (Exception e) {
-					logger.error("Incomming stanza interceptor [{}] threw an exception.", interceptor, e);
+			if (msg instanceof Element) {
+				Element stanza = (Element)msg;
+				
+				for (KixmppStanzaInterceptor interceptor : incomingStanzaInterceptors) {
+					try {
+						interceptor.interceptStanza((Element)msg);
+					} catch (Exception e) {
+						logger.error("Incomming stanza interceptor [{}] threw an exception.", interceptor, e);
+					}
 				}
+	
+				reactor.notify(Tuple.of(clientId, stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(stanza));
 			}
-
-			reactor.notify(Tuple.of(clientId, stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(stanza));
 		}
 		
 		@Override

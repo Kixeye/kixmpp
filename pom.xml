@@ -19,6 +19,7 @@
 	<modules>
 		<module>kixmpp-core</module>
 		<module>kixmpp-client</module>
+		<module>kixmpp-server</module>
 	</modules>
 
 	<licenses>
