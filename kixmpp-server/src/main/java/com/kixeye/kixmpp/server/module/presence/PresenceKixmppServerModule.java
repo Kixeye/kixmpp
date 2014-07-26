@@ -8,17 +8,17 @@ import java.util.List;
 
 import org.jdom2.Element;
 
+import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.KixmppStanzaHandler;
-import com.kixeye.kixmpp.server.module.KixmppModule;
-import com.kixeye.kixmpp.server.module.bind.KixmppBindModule;
+import com.kixeye.kixmpp.server.module.KixmppServerModule;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
 /**
  * Handles MUC features.
  * 
  * @author ebahtijaragic
  */
-public class KixmppPresenceModule implements KixmppModule {
+public class PresenceKixmppServerModule implements KixmppServerModule {
 	public static AttributeKey<String> PRESENCE = AttributeKey.valueOf("PRESENCE");
 	
 	private KixmppServer server;
@@ -29,14 +29,14 @@ public class KixmppPresenceModule implements KixmppModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getHandlerRegistry().register("presence", null, PRESENCE_HANDLER);
+		this.server.getEventEngine().register("presence", null, PRESENCE_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getHandlerRegistry().unregister("presence", null, PRESENCE_HANDLER);
+		this.server.getEventEngine().unregister("presence", null, PRESENCE_HANDLER);
 	}
 
 	/**
@@ -53,8 +53,8 @@ public class KixmppPresenceModule implements KixmppModule {
 		public void handle(Channel channel, Element stanza) {
 			if (stanza.getAttributeValue("to") == null) {
 				Element presence = new Element("presence");
-				presence.setAttribute("from", channel.attr(KixmppBindModule.JID).get().toString());
-				presence.setAttribute("to", channel.attr(KixmppBindModule.JID).get().toString());
+				presence.setAttribute("from", channel.attr(BindKixmppServerModule.JID).get().toString());
+				presence.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
 				
 				channel.writeAndFlush(presence);
 			}

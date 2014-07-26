@@ -56,7 +56,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.kixeye.kixmpp.client.module.presence.Presence;
-import com.kixeye.kixmpp.client.module.presence.PresenceKixmppModule;
+import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 
 /**
  * Tests the {@link KixmppClient}
@@ -127,7 +127,7 @@ public class KixmppClientTest {
 		try (KixmppClient client = new KixmppClient(createSslContext())) {
 			Assert.assertNotNull(client.connect("localhost", port, domain).await(2, TimeUnit.SECONDS));
 			Assert.assertNotNull(client.login(username, password, resource).await(2, TimeUnit.SECONDS));
-			client.module(PresenceKixmppModule.class).updatePresence(new Presence());
+			client.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
 			Thread.sleep(1000);
 		}
 	}

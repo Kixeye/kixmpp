@@ -54,20 +54,19 @@ import reactor.core.composable.Deferred;
 import reactor.core.composable.Promise;
 import reactor.core.composable.spec.Promises;
 import reactor.core.spec.Reactors;
-import reactor.event.Event;
-import reactor.tuple.Tuple;
 
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.client.KixmppClient;
-import com.kixeye.kixmpp.server.module.KixmppModule;
-import com.kixeye.kixmpp.server.module.auth.KixmppSaslModule;
-import com.kixeye.kixmpp.server.module.bind.KixmppBindModule;
-import com.kixeye.kixmpp.server.module.features.KixmppFeaturesModule;
-import com.kixeye.kixmpp.server.module.muc.KixmppMucModule;
-import com.kixeye.kixmpp.server.module.presence.KixmppPresenceModule;
-import com.kixeye.kixmpp.server.module.session.KixmppSessionModule;
+import com.kixeye.kixmpp.handler.KixmppEventEngine;
+import com.kixeye.kixmpp.server.module.KixmppServerModule;
+import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
+import com.kixeye.kixmpp.server.module.features.FeaturesKixmppServerModule;
+import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
+import com.kixeye.kixmpp.server.module.presence.PresenceKixmppServerModule;
+import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
 
 /**
  * A XMPP server.
@@ -87,12 +86,12 @@ public class KixmppServer implements AutoCloseable {
 	private final Environment environment;
 	private final Reactor reactor;
 
-	private final KixmppHandlerRegistry handlerRegistry;
+	private final KixmppEventEngine eventEngine;
 	
 	private final SslContext sslContext;
 
 	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
-	private final ConcurrentHashMap<String, KixmppModule> modules = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<String, KixmppServerModule> modules = new ConcurrentHashMap<>();
 	
 	private final AtomicReference<ChannelFuture> channelFuture = new AtomicReference<>();
 	private final AtomicReference<Channel> channel = new AtomicReference<>();
@@ -166,17 +165,17 @@ public class KixmppServer implements AutoCloseable {
 
 		this.bindAddress = bindAddress;
 		this.domain = domain;
-		this.handlerRegistry = new KixmppHandlerRegistry(reactor);
+		this.eventEngine = new KixmppEventEngine(reactor);
 		this.environment = environment;
 		this.reactor = reactor;
 		this.sslContext = sslContext;
 		
-		this.modulesToRegister.add(KixmppFeaturesModule.class.getName());
-		this.modulesToRegister.add(KixmppSaslModule.class.getName());
-		this.modulesToRegister.add(KixmppBindModule.class.getName());
-		this.modulesToRegister.add(KixmppSessionModule.class.getName());
-		this.modulesToRegister.add(KixmppPresenceModule.class.getName());
-		this.modulesToRegister.add(KixmppMucModule.class.getName());
+		this.modulesToRegister.add(FeaturesKixmppServerModule.class.getName());
+		this.modulesToRegister.add(SaslKixmppServerModule.class.getName());
+		this.modulesToRegister.add(BindKixmppServerModule.class.getName());
+		this.modulesToRegister.add(SessionKixmppServerModule.class.getName());
+		this.modulesToRegister.add(PresenceKixmppServerModule.class.getName());
+		this.modulesToRegister.add(MucKixmppServerModule.class.getName());
 	}
 	
 	/**
@@ -231,7 +230,7 @@ public class KixmppServer implements AutoCloseable {
 
 		logger.info("Stopping Kixmpp Server...");
 		
-		for (Entry<String, KixmppModule> entry : modules.entrySet()) {
+		for (Entry<String, KixmppServerModule> entry : modules.entrySet()) {
 			entry.getValue().uninstall(this);
 		}
 		
@@ -252,7 +251,7 @@ public class KixmppServer implements AutoCloseable {
 					
 					state.set(State.STOPPED);
 					
-					handlerRegistry.unregisterAll();
+					eventEngine.unregisterAll();
 					
 					deferred.accept(KixmppServer.this);
 				}
@@ -314,7 +313,7 @@ public class KixmppServer implements AutoCloseable {
      * @return
      */
     @SuppressWarnings("unchecked")
-	public <T extends KixmppModule> T module(Class<T> moduleClass) {
+	public <T extends KixmppServerModule> T module(Class<T> moduleClass) {
     	T module = (T)modules.get(moduleClass.getName());
     	
     	if (module == null) {
@@ -329,17 +328,17 @@ public class KixmppServer implements AutoCloseable {
      * 
      * @return
      */
-    public Collection<KixmppModule> modules() {
+    public Collection<KixmppServerModule> modules() {
     	return modules.values();
     }
 
     /**
-     * Gets the handler registry.
+     * Gets the event engine.
      * 
      * @return
      */
-    public KixmppHandlerRegistry getHandlerRegistry() {
-    	return handlerRegistry;
+    public KixmppEventEngine getEventEngine() {
+    	return eventEngine;
     }
     
     /**
@@ -362,11 +361,11 @@ public class KixmppServer implements AutoCloseable {
      * @param moduleClassName
      * @throws Exception
      */
-    private KixmppModule installModule(String moduleClassName) {
-    	KixmppModule module = null;
+	private KixmppServerModule installModule(String moduleClassName) {
+		KixmppServerModule module = null;
 		
 		try {
-			module = (KixmppModule)Class.forName(moduleClassName).newInstance();
+			module = (KixmppServerModule)Class.forName(moduleClassName).newInstance();
 			module.install(this);
 			
 			modules.put(moduleClassName, module);
@@ -416,15 +415,15 @@ public class KixmppServer implements AutoCloseable {
 			if (msg instanceof Element) {
 				Element stanza = (Element)msg;
 				
-				reactor.notify(Tuple.of(stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(Tuple.of(ctx.channel(), stanza)));
+				eventEngine.publish(ctx.channel(), stanza);
 			} else if (msg instanceof KixmppStreamStart) {
 				KixmppStreamStart streamStart = (KixmppStreamStart)msg;
 
-				reactor.notify(Tuple.of("stream:stream", "http://etherx.jabber.org/streams", "start"), Event.wrap(Tuple.of(ctx.channel(), streamStart)));
+				eventEngine.publish(ctx.channel(), streamStart);
 			} else if (msg instanceof KixmppStreamEnd) {
 				KixmppStreamEnd streamEnd = (KixmppStreamEnd)msg;
 
-				reactor.notify(Tuple.of("stream:stream", "http://etherx.jabber.org/streams", "end"), Event.wrap(Tuple.of(ctx.channel(), streamEnd)));
+				eventEngine.publish(ctx.channel(), streamEnd);
 			} else {
 				logger.error("Unknown message type [{}] from Channel [{}]", msg, ctx.channel());
 			}

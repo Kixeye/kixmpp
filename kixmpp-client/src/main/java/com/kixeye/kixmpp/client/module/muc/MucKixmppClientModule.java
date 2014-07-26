@@ -20,6 +20,8 @@ package com.kixeye.kixmpp.client.module.muc;
  * #L%
  */
 
+import io.netty.channel.Channel;
+
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,16 +32,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kixeye.kixmpp.client.KixmppClient;
-import com.kixeye.kixmpp.client.KixmppStanzaHandler;
-import com.kixeye.kixmpp.client.module.KixmppModule;
+import com.kixeye.kixmpp.client.module.KixmppClientModule;
+import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 
 /**
- * A {@link KixmppModule} that deals with MUCs.
+ * A {@link KixmppClientModule} that deals with MUCs.
  * 
  * @author ebahtijaragic
  */
-public class MucKixmppModule implements KixmppModule {
-	private static final Logger logger = LoggerFactory.getLogger(MucKixmppModule.class);
+public class MucKixmppClientModule implements KixmppClientModule {
+	private static final Logger logger = LoggerFactory.getLogger(MucKixmppClientModule.class);
 	
 	private Set<MucListener<MucMessage>> messageListeners = Collections.newSetFromMap(new ConcurrentHashMap<MucListener<MucMessage>, Boolean>());
 	private Set<MucListener<MucInvite>> invitationListeners = Collections.newSetFromMap(new ConcurrentHashMap<MucListener<MucInvite>, Boolean>());
@@ -140,25 +142,26 @@ public class MucKixmppModule implements KixmppModule {
 	}
 	
 	/**
-	 * @see com.kixeye.kixmpp.client.module.KixmppModule#install(com.kixeye.kixmpp.client.KixmppClient)
+	 * @see com.kixeye.kixmpp.client.module.KixmppClientModule#install(com.kixeye.kixmpp.client.KixmppClient)
 	 */
 	public void install(KixmppClient client) {
 		this.client = client;
 		
-		client.getHandlerRegistry().register("message", "jabber:client", mucMessageHandler);
-		client.getHandlerRegistry().register("presence", "jabber:client", mucPresenceHandler);
+		client.getEventEngine().register("message", "jabber:client", mucMessageHandler);
+		client.getEventEngine().register("presence", "jabber:client", mucPresenceHandler);
 	}
 
 	/**
-	 * @see com.kixeye.kixmpp.client.module.KixmppModule#uninstall(com.kixeye.kixmpp.client.KixmppClient)
+	 * @see com.kixeye.kixmpp.client.module.KixmppClientModule#uninstall(com.kixeye.kixmpp.client.KixmppClient)
 	 */
 	public void uninstall(KixmppClient client) {
-		client.getHandlerRegistry().unregister("message", "jabber:client", mucMessageHandler);
-		client.getHandlerRegistry().unregister("presence", "jabber:client", mucPresenceHandler);
+		client.getEventEngine().unregister("message", "jabber:client", mucMessageHandler);
+		client.getEventEngine().unregister("presence", "jabber:client", mucPresenceHandler);
 	}
 	
 	private KixmppStanzaHandler mucPresenceHandler = new KixmppStanzaHandler() {
-		public void handle(Element stanza) {
+		@Override
+		public void handle(Channel channel, Element stanza) {
 			Element inX  = stanza.getChild("x", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
 			
 			if (inX != null) {
@@ -185,7 +188,7 @@ public class MucKixmppModule implements KixmppModule {
 	};
 	
 	private KixmppStanzaHandler mucMessageHandler = new KixmppStanzaHandler() {
-		public void handle(Element stanza) {
+		public void handle(Channel channel, Element stanza) {
 			String type = stanza.getAttributeValue("type");
 			
 			if (type == null) {

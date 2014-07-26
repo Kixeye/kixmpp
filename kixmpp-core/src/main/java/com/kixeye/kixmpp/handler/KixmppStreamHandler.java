@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server;
+package com.kixeye.kixmpp.handler;
 
 /*
  * #%L

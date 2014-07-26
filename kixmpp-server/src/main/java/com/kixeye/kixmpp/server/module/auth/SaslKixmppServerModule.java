@@ -14,18 +14,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.jdom2.Element;
 
-import com.kixeye.kixmpp.server.KixmppJid;
+import com.kixeye.kixmpp.KixmppJid;
+import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.KixmppStanzaHandler;
-import com.kixeye.kixmpp.server.module.KixmppModule;
-import com.kixeye.kixmpp.server.module.bind.KixmppBindModule;
+import com.kixeye.kixmpp.server.module.KixmppServerModule;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
 /**
  * Handles SASL auth.
  * 
  * @author ebahtijaragic
  */
-public class KixmppSaslModule implements KixmppModule {
+public class SaslKixmppServerModule implements KixmppServerModule {
 	public static AttributeKey<Boolean> IS_AUTHENTICATED = AttributeKey.valueOf("IS_AUTHENTICATED");
 	
 	private Map<String, String> users = new ConcurrentHashMap<>();
@@ -38,14 +38,14 @@ public class KixmppSaslModule implements KixmppModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getHandlerRegistry().register("auth", null, AUTH_HANDLER);
+		this.server.getEventEngine().register("auth", null, AUTH_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getHandlerRegistry().unregister("auth", null, AUTH_HANDLER);
+		this.server.getEventEngine().unregister("auth", null, AUTH_HANDLER);
 	}
 
 	/**
@@ -102,7 +102,7 @@ public class KixmppSaslModule implements KixmppModule {
 					
 					if (password != null && password.equals(credentialsSplit[2])) {
 						channel.attr(IS_AUTHENTICATED).set(true);
-						channel.attr(KixmppBindModule.JID).set(new KixmppJid(username, server.getDomain(), UUID.randomUUID().toString().replace("-", "")));
+						channel.attr(BindKixmppServerModule.JID).set(new KixmppJid(username, server.getDomain(), UUID.randomUUID().toString().replace("-", "")));
 						
 						Element success = new Element("success", null, "urn:ietf:params:xml:ns:xmpp-sasl");
 						

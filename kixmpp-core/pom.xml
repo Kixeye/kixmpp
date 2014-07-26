@@ -41,6 +41,13 @@
 	</properties>
 
 	<dependencies>
+		<!-- Reactor -->
+		<dependency>
+			<groupId>org.projectreactor</groupId>
+			<artifactId>reactor-core</artifactId>
+			<version>${reactor.version}</version>
+		</dependency>
+		
 		<!-- Netty -->
 		<dependency>
 			<groupId>io.netty</groupId>

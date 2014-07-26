@@ -31,13 +31,13 @@ import org.junit.Test;
 
 import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.client.module.muc.MucJoin;
-import com.kixeye.kixmpp.client.module.muc.MucKixmppModule;
+import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
 import com.kixeye.kixmpp.client.module.muc.MucListener;
 import com.kixeye.kixmpp.client.module.muc.MucMessage;
 import com.kixeye.kixmpp.client.module.presence.Presence;
-import com.kixeye.kixmpp.client.module.presence.PresenceKixmppModule;
+import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceListener;
-import com.kixeye.kixmpp.server.module.auth.KixmppSaslModule;
+import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 
 /**
  * Tests the {@link KixmppServer}
@@ -50,7 +50,7 @@ public class KixmppServerTest {
 		try (KixmppServer server = new KixmppServer("testChat", SslContext.newClientContext())) {
 			Assert.assertNotNull(server.start().await(2, TimeUnit.SECONDS));
 			
-			server.module(KixmppSaslModule.class).addUser("testUser", "testPassword");
+			server.module(SaslKixmppServerModule.class).addUser("testUser", "testPassword");
 			
 			try (KixmppClient client = new KixmppClient(SslContext.newClientContext())) {
 				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();
@@ -59,36 +59,36 @@ public class KixmppServerTest {
 
 				Assert.assertNotNull(client.connect("localhost", server.getBindAddress().getPort(), server.getDomain()).await(2, TimeUnit.SECONDS));
 
-				client.module(PresenceKixmppModule.class).addPresenceListener(new PresenceListener() {
+				client.module(PresenceKixmppClientModule.class).addPresenceListener(new PresenceListener() {
 					public void handle(Presence presence) {
 						presences.offer(presence);
 					}
 				});
 				
-				client.module(MucKixmppModule.class).addJoinListener(new MucListener<MucJoin>() {
+				client.module(MucKixmppClientModule.class).addJoinListener(new MucListener<MucJoin>() {
 					public void handle(MucJoin event) {
 						mucJoins.offer(event);
 					}
 				});
 				
-				client.module(MucKixmppModule.class).addMessageListener(new MucListener<MucMessage>() {
+				client.module(MucKixmppClientModule.class).addMessageListener(new MucListener<MucMessage>() {
 					public void handle(MucMessage event) {
 						mucMessages.offer(event);
 					}
 				});
 				
 				Assert.assertNotNull(client.login("testUser", "testPassword", "testResource").await(2, TimeUnit.SECONDS));
-				client.module(PresenceKixmppModule.class).updatePresence(new Presence());
+				client.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
 				
 				Assert.assertNotNull(presences.poll(2, TimeUnit.SECONDS));
 				
-				client.module(MucKixmppModule.class).joinRoom("someRoom@conference.testChat", "testNick");
+				client.module(MucKixmppClientModule.class).joinRoom("someRoom@conference.testChat", "testNick");
 				
 				MucJoin mucJoin = mucJoins.poll(2, TimeUnit.SECONDS);
 				
 				Assert.assertNotNull(mucJoin);
 				
-				client.module(MucKixmppModule.class).sendRoomMessage(mucJoin.getRoomJid(), "someMessage");
+				client.module(MucKixmppClientModule.class).sendRoomMessage(mucJoin.getRoomJid(), "someMessage");
 
 				MucMessage mucMessage = mucMessages.poll(2, TimeUnit.SECONDS);
 

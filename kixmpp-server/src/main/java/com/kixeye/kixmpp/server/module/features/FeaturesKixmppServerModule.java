@@ -9,16 +9,16 @@ import org.jdom2.Element;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.handler.KixmppStreamHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.KixmppStreamHandler;
-import com.kixeye.kixmpp.server.module.KixmppModule;
+import com.kixeye.kixmpp.server.module.KixmppServerModule;
 
 /**
  * Displays features to the client.
  * 
  * @author ebahtijaragic
  */
-public class KixmppFeaturesModule implements KixmppModule {
+public class FeaturesKixmppServerModule implements KixmppServerModule {
 	private KixmppServer server;
 	
 	/**
@@ -27,14 +27,14 @@ public class KixmppFeaturesModule implements KixmppModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getHandlerRegistry().register(SERVER_FEATURE_HANDLER);
+		this.server.getEventEngine().register(SERVER_FEATURE_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getHandlerRegistry().unregister(SERVER_FEATURE_HANDLER);
+		this.server.getEventEngine().unregister(SERVER_FEATURE_HANDLER);
 	}
 
 	/**
@@ -53,7 +53,7 @@ public class KixmppFeaturesModule implements KixmppModule {
 			
 			Element features = new Element("features", "stream", "http://etherx.jabber.org/streams");
 			
-			for (KixmppModule module : server.modules()) {
+			for (KixmppServerModule module : server.modules()) {
 				List<Element> featuresList = module.getFeatures();
 				
 				if (featuresList != null) {

@@ -62,16 +62,14 @@ import reactor.core.composable.Deferred;
 import reactor.core.composable.Promise;
 import reactor.core.composable.spec.Promises;
 import reactor.core.spec.Reactors;
-import reactor.event.Event;
 import reactor.event.registry.Registration;
-import reactor.event.selector.Selectors;
-import reactor.function.Consumer;
-import reactor.tuple.Tuple;
 
 import com.kixeye.kixmpp.KixmppCodec;
-import com.kixeye.kixmpp.client.module.KixmppModule;
-import com.kixeye.kixmpp.client.module.muc.MucKixmppModule;
-import com.kixeye.kixmpp.client.module.presence.PresenceKixmppModule;
+import com.kixeye.kixmpp.client.module.KixmppClientModule;
+import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
+import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
+import com.kixeye.kixmpp.handler.KixmppEventEngine;
+import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 
 /**
  * A XMPP client.
@@ -86,7 +84,7 @@ public class KixmppClient implements AutoCloseable {
     private final ConcurrentHashMap<KixmppClientOption<?>, Object> clientOptions = new ConcurrentHashMap<KixmppClientOption<?>, Object>();
 	private final Bootstrap bootstrap;
 	
-	private final KixmppStanzaHandlerRegistry handlerRegistry;
+	private final KixmppEventEngine eventEngine;
 	
 	private final Environment environment;
 	private final Reactor reactor;
@@ -99,7 +97,7 @@ public class KixmppClient implements AutoCloseable {
 	private final Set<KixmppStanzaInterceptor> outgoingStanzaInterceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
 
 	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
-	private final ConcurrentHashMap<String, KixmppModule> modules = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<String, KixmppClientModule> modules = new ConcurrentHashMap<>();
 	
 	private Deferred<KixmppClient, Promise<KixmppClient>> deferredLogin;
 	private Deferred<KixmppClient, Promise<KixmppClient>> deferredDisconnect;
@@ -167,11 +165,11 @@ public class KixmppClient implements AutoCloseable {
 		this.environment = environment;
 		this.reactor = reactor;
 		this.sslContext = sslContext;
-		this.handlerRegistry = new KixmppStanzaHandlerRegistry(clientId, reactor);
+		this.eventEngine = new KixmppEventEngine(clientId, reactor);
 		
 		// set modules to be registered
-		this.modulesToRegister.add(MucKixmppModule.class.getName());
-		this.modulesToRegister.add(PresenceKixmppModule.class.getName());
+		this.modulesToRegister.add(MucKixmppClientModule.class.getName());
+		this.modulesToRegister.add(PresenceKixmppClientModule.class.getName());
 	}
 	
 	/**
@@ -339,12 +337,12 @@ public class KixmppClient implements AutoCloseable {
     }
     
     /**
-     * Gets the handler registry.
+     * Gets the event engine.
      * 
      * @return
      */
-    public KixmppStanzaHandlerRegistry getHandlerRegistry() {
-    	return handlerRegistry;
+    public KixmppEventEngine getEventEngine() {
+    	return eventEngine;
     }
     
     /**
@@ -362,7 +360,7 @@ public class KixmppClient implements AutoCloseable {
      * @return
      */
     @SuppressWarnings("unchecked")
-	public <T extends KixmppModule> T module(Class<T> moduleClass) {
+	public <T extends KixmppClientModule> T module(Class<T> moduleClass) {
     	if (!(state.get() == State.CONNECTED || state.get() == State.LOGGED_IN)) {
 			throw new IllegalStateException(String.format("The current state is [%s] but must be [CONNECTED or LOGGED_IN]", state.get()));
     	}
@@ -432,17 +430,14 @@ public class KixmppClient implements AutoCloseable {
     private void setUp() {
     	if (state.get() == State.CONNECTING) {
     		// this client deals with the following stanzas
-    		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "stream:features", "http://etherx.jabber.org/streams")), streamFeaturesConsumer));
+    		eventEngine.register("stream:features", "http://etherx.jabber.org/streams", streamFeaturesHandler);
 
-    		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "proceed", "urn:ietf:params:xml:ns:xmpp-tls")), tlsResponseConsumer));
+    		eventEngine.register("proceed", "urn:ietf:params:xml:ns:xmpp-tls", tlsResponseHandler);
     		
-    		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "success", "urn:ietf:params:xml:ns:xmpp-sasl")), authResultConsumer));
-    		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "failure", "urn:ietf:params:xml:ns:xmpp-sasl")), authResultConsumer));
+    		eventEngine.register("success", "urn:ietf:params:xml:ns:xmpp-sasl", authResultHandler);
+    		eventEngine.register("failure", "urn:ietf:params:xml:ns:xmpp-sasl", authResultHandler);
 
-    		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "iq", "jabber:client")), iqResultConsumer));
-    		
-    		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "bind")), iqBindResultConsumer));
-    		consumerRegistrations.offer(reactor.on(Selectors.$(Tuple.of(clientId, "session")), iqSessionResultConsumer));
+    		eventEngine.register("iq", "jabber:client", iqResultHandler);
     		
     		// register all modules
     		for (String moduleClassName : modulesToRegister) {
@@ -462,11 +457,11 @@ public class KixmppClient implements AutoCloseable {
     			registration.cancel();
     		}
     		
-    		for (Entry<String, KixmppModule> entry : modules.entrySet()) {
+    		for (Entry<String, KixmppClientModule> entry : modules.entrySet()) {
     			entry.getValue().uninstall(this);
     		}
     		
-    		handlerRegistry.unregisterAll();
+    		eventEngine.unregisterAll();
     	}
     }
     
@@ -476,11 +471,11 @@ public class KixmppClient implements AutoCloseable {
      * @param moduleClassName
      * @throws Exception
      */
-    private KixmppModule installModule(String moduleClassName) {
-    	KixmppModule module = null;
+    private KixmppClientModule installModule(String moduleClassName) {
+    	KixmppClientModule module = null;
 		
 		try {
-			module = (KixmppModule)Class.forName(moduleClassName).newInstance();
+			module = (KixmppClientModule)Class.forName(moduleClassName).newInstance();
 			module.install(this);
 			
 			modules.put(moduleClassName, module);
@@ -514,11 +509,9 @@ public class KixmppClient implements AutoCloseable {
     /**
      * Handles stream features
      */
-    private final Consumer<Event<Element>> streamFeaturesConsumer = new Consumer<Event<Element>>() {
-		public void accept(Event<Element> event) {
-			Element features = event.getData();
-			
-			Element startTls = features.getChild("starttls", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-tls"));
+    private final KixmppStanzaHandler streamFeaturesHandler = new KixmppStanzaHandler() {
+		public void handle(Channel channel, Element streamFeatures) {
+			Element startTls = streamFeatures.getChild("starttls", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-tls"));
 			
 			Object enableTls = clientOptions.get(KixmppClientOption.ENABLE_TLS);
 			
@@ -526,7 +519,7 @@ public class KixmppClient implements AutoCloseable {
 				// if its required, always do tls
 				startTls = new Element("starttls", "tls", "urn:ietf:params:xml:ns:xmpp-tls");
 				
-				channel.get().writeAndFlush(startTls);
+				KixmppClient.this.channel.get().writeAndFlush(startTls);
 			} else {
 				performAuth();
 			}
@@ -536,23 +529,23 @@ public class KixmppClient implements AutoCloseable {
 	/**
      * Handles stream features
      */
-    private final Consumer<Event<Element>> tlsResponseConsumer = new Consumer<Event<Element>>() {
-		public void accept(Event<Element> event) {
+    private final KixmppStanzaHandler tlsResponseHandler = new KixmppStanzaHandler() {
+		public void handle(Channel channel, Element tlsResponse) {
 			if (state.compareAndSet(State.LOGGING_IN, State.SECURING)) {
-				SslHandler handler = sslContext.newHandler(channel.get().alloc());
+				SslHandler handler = sslContext.newHandler(KixmppClient.this.channel.get().alloc());
 				handler.handshakeFuture().addListener(new GenericFutureListener<Future<? super Channel>>() {
 					public void operationComplete(Future<? super Channel> future) throws Exception {
 						if (future.isSuccess()) {
-							channel.get().pipeline().replace(KixmppCodec.class, "kixmppCodec", new KixmppCodec());
+							KixmppClient.this.channel.get().pipeline().replace(KixmppCodec.class, "kixmppCodec", new KixmppCodec());
 							
-							KixmppCodec.sendXmppStreamRootStart(channel.get(), null, domain);
+							KixmppCodec.sendXmppStreamRootStart(KixmppClient.this.channel.get(), null, domain);
 						} else {
 							deferredLogin.accept(new KixmppAuthException("tls failed"));
 						}
 					}
 				});
 				
-				channel.get().pipeline().addFirst("sslHandler", handler);
+				KixmppClient.this.channel.get().pipeline().addFirst("sslHandler", handler);
 			}
 		}
 	};
@@ -560,10 +553,9 @@ public class KixmppClient implements AutoCloseable {
 	/**
      * Handles auth success
      */
-    private final Consumer<Event<Element>> authResultConsumer = new Consumer<Event<Element>>() {
-		public void accept(Event<Element> event) {
-			Element authResponse = event.getData();
-			switch (authResponse.getName()) {
+    private final KixmppStanzaHandler authResultHandler = new KixmppStanzaHandler() {
+		public void handle(Channel channel, Element authResult) {
+			switch (authResult.getName()) {
 				case "success":
 					// send bind
 					Element bindRequest = new Element("iq");
@@ -580,92 +572,65 @@ public class KixmppClient implements AutoCloseable {
 					
 					bindRequest.addContent(bind);
 		
-					channel.get().writeAndFlush(bindRequest);
+					KixmppClient.this.channel.get().writeAndFlush(bindRequest);
 					break;
 				default:
 					// fail
-					deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(authResponse)));
+					deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(authResult)));
 					break;
 			}
-		}
-	};
-	
-	/**
-     * Handles iq bind response
-     */
-    private final Consumer<Event<Element>> iqBindResultConsumer = new Consumer<Event<Element>>() {
-		public void accept(Event<Element> event) {
-			Element iqResponse = event.getData();
-
-			Attribute typeAttribute = iqResponse.getAttribute("type");
-			
-			if (typeAttribute != null && "result".equals(typeAttribute.getValue())) {
-				Element bind = iqResponse.getChild("bind", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
-				
-				if (bind != null) {
-					jid = bind.getChildText("jid", bind.getNamespace());
-				}
-
-				// start the session
-				Element startSession = new Element("iq");
-				startSession.setAttribute("to", domain);
-				startSession.setAttribute("type", "set");
-				startSession.setAttribute("id", "session");
-				
-				Element session = new Element("session", "urn:ietf:params:xml:ns:xmpp-session");
-				startSession.addContent(session);
-
-				channel.get().writeAndFlush(startSession);
-			} else {
-				// fail
-				deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(iqResponse)));
-			}
-		}
-	};
-	
-	/**
-     * Handles iq bind response
-     */
-    private final Consumer<Event<Element>> iqSessionResultConsumer = new Consumer<Event<Element>>() {
-		public void accept(Event<Element> event) {
-			Element iqResponse = event.getData();
-			
-			Attribute typeAttribute = iqResponse.getAttribute("type");
-			
-			if (typeAttribute != null && "result".equals(typeAttribute.getValue())) {
-				deferredLogin.accept(KixmppClient.this);
-				state.set(State.LOGGED_IN);
-				
-				logger.debug("Logged in as: " + jid);
-			} else {
-				// fail
-				deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(iqResponse)));
-			}
-
-			// no need to keep reference around
-			deferredLogin = null;
 		}
 	};
 	
 	/**
      * Handles iq stanzas
      */
-    private final Consumer<Event<Element>> iqResultConsumer = new Consumer<Event<Element>>() {
-		public void accept(Event<Element> event) {
-			Element iqResponse = event.getData();
-			
-			Attribute idAttribute = iqResponse.getAttribute("id");
+    private final KixmppStanzaHandler iqResultHandler = new KixmppStanzaHandler() {
+		public void handle(Channel channel, Element iqResult) {
+			Attribute idAttribute = iqResult.getAttribute("id");
+			Attribute typeAttribute = iqResult.getAttribute("type");
 			
 			if (idAttribute != null) {
 				switch (idAttribute.getValue()) {
 					case "bind":
-						reactor.notify(Tuple.of(clientId, "bind"), event);
+						if (typeAttribute != null && "result".equals(typeAttribute.getValue())) {
+							Element bind = iqResult.getChild("bind", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
+							
+							if (bind != null) {
+								jid = bind.getChildText("jid", bind.getNamespace());
+							}
+
+							// start the session
+							Element startSession = new Element("iq");
+							startSession.setAttribute("to", domain);
+							startSession.setAttribute("type", "set");
+							startSession.setAttribute("id", "session");
+							
+							Element session = new Element("session", "urn:ietf:params:xml:ns:xmpp-session");
+							startSession.addContent(session);
+
+							KixmppClient.this.channel.get().writeAndFlush(startSession);
+						} else {
+							// fail
+							deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(iqResult)));
+						}
 						break;
 					case "session":
-						reactor.notify(Tuple.of(clientId, "session"), event);
+						if (typeAttribute != null && "result".equals(typeAttribute.getValue())) {
+							deferredLogin.accept(KixmppClient.this);
+							state.set(State.LOGGED_IN);
+							
+							logger.debug("Logged in as: " + jid);
+						} else {
+							// fail
+							deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(iqResult)));
+						}
+
+						// no need to keep reference around
+						deferredLogin = null;
 						break;
 					default:
-						logger.warn("Unsupported IQ stanza: " + new XMLOutputter().outputString(iqResponse));
+						logger.warn("Unsupported IQ stanza: " + new XMLOutputter().outputString(iqResult));
 						break;
 				}
 			}
@@ -707,7 +672,7 @@ public class KixmppClient implements AutoCloseable {
 					}
 				}
 	
-				reactor.notify(Tuple.of(clientId, stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(stanza));
+				eventEngine.publish(ctx.channel(), stanza);
 			}
 		}
 		

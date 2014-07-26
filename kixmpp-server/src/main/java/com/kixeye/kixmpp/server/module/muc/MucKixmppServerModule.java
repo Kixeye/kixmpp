@@ -10,17 +10,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 
-import com.kixeye.kixmpp.server.KixmppJid;
+import com.kixeye.kixmpp.KixmppJid;
+import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.KixmppStanzaHandler;
-import com.kixeye.kixmpp.server.module.KixmppModule;
+import com.kixeye.kixmpp.server.module.KixmppServerModule;
 
 /**
  * Handles presence.
  * 
  * @author ebahtijaragic
  */
-public class KixmppMucModule implements KixmppModule {
+public class MucKixmppServerModule implements KixmppServerModule {
 	private KixmppServer server;
 	
 	private Map<KixmppJid, MucRoom> rooms = new ConcurrentHashMap<>();
@@ -31,16 +31,16 @@ public class KixmppMucModule implements KixmppModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getHandlerRegistry().register("presence", null, JOIN_ROOM_HANDLER);
-		this.server.getHandlerRegistry().register("message", null, ROOM_MESSAGE_HANDLER);
+		this.server.getEventEngine().register("presence", null, JOIN_ROOM_HANDLER);
+		this.server.getEventEngine().register("message", null, ROOM_MESSAGE_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getHandlerRegistry().unregister("presence", null, JOIN_ROOM_HANDLER);
-		this.server.getHandlerRegistry().unregister("message", null, ROOM_MESSAGE_HANDLER);
+		this.server.getEventEngine().unregister("presence", null, JOIN_ROOM_HANDLER);
+		this.server.getEventEngine().unregister("message", null, ROOM_MESSAGE_HANDLER);
 	}
 
 	/**

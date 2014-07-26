@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.client;
+package com.kixeye.kixmpp.handler;
 
 /*
  * #%L
@@ -20,6 +20,8 @@ package com.kixeye.kixmpp.client;
  * #L%
  */
 
+import io.netty.channel.Channel;
+
 import org.jdom2.Element;
 
 /**
@@ -31,7 +33,8 @@ public interface KixmppStanzaHandler {
 	/**
 	 * Handles a stanza.
 	 * 
+	 * @param channel
 	 * @param stanza
 	 */
-	public void handle(Element stanza);
+	public void handle(Channel channel, Element stanza);
 }

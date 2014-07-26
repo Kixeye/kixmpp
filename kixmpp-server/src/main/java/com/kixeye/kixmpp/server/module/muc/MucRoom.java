@@ -10,8 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 
-import com.kixeye.kixmpp.server.KixmppJid;
-import com.kixeye.kixmpp.server.module.bind.KixmppBindModule;
+import com.kixeye.kixmpp.KixmppJid;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
 /**
  * A simple muc room.
@@ -44,7 +44,7 @@ public class MucRoom {
 				Element presence = new Element("presence");
 				presence.setAttribute("id", UUID.randomUUID().toString());
 				presence.setAttribute("from", roomJid.withResource(nickname).toString());
-				presence.setAttribute("to", channel.attr(KixmppBindModule.JID).get().toString());
+				presence.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
 				
 				Element x = new Element("x", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
 				
@@ -59,7 +59,7 @@ public class MucRoom {
 				Element message = new Element("message");
 				message.setAttribute("id", UUID.randomUUID().toString());
 				message.setAttribute("from", roomJid.withResource(nickname).toString());
-				message.setAttribute("to", channel.attr(KixmppBindModule.JID).get().toString());
+				message.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
 				message.setAttribute("type", "groupchat");
 				
 				message.addContent(new Element("subject"));
@@ -100,7 +100,7 @@ public class MucRoom {
 				Element message = new Element("message");
 				message.setAttribute("id", UUID.randomUUID().toString());
 				message.setAttribute("from", roomJid.withResource(channelToNickname.get(channel)).toString());
-				message.setAttribute("to", userChannel.attr(KixmppBindModule.JID).get().toString());
+				message.setAttribute("to", userChannel.attr(BindKixmppServerModule.JID).get().toString());
 				message.setAttribute("type", "groupchat");
 				message.addContent(body);
 				

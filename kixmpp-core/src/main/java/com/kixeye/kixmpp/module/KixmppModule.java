@@ -1,10 +1,5 @@
-package com.kixeye.kixmpp.server.module;
+package com.kixeye.kixmpp.module;
 
-import java.util.List;
-
-import org.jdom2.Element;
-
-import com.kixeye.kixmpp.server.KixmppServer;
 
 /*
  * #%L
@@ -32,25 +27,18 @@ import com.kixeye.kixmpp.server.KixmppServer;
  * 
  * @author ebahtijaragic
  */
-public interface KixmppModule {
+public interface KixmppModule<T> {
 	/**
 	 * Installs the module.
 	 * 
 	 * @param server
 	 */
-	public void install(KixmppServer server);
+	public void install(T server);
 	
 	/**
 	 * Uninstalls the module.
 	 * 
 	 * @param server
 	 */
-	public void uninstall(KixmppServer server);
-	
-	/**
-	 * Gets a list of features added by this module.
-	 * 
-	 * @return
-	 */
-	public List<Element> getFeatures();
+	public void uninstall(T server);
 }

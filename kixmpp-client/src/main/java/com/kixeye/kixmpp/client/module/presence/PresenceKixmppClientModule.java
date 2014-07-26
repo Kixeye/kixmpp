@@ -20,6 +20,8 @@ package com.kixeye.kixmpp.client.module.presence;
  * #L%
  */
 
+import io.netty.channel.Channel;
+
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,16 +31,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kixeye.kixmpp.client.KixmppClient;
-import com.kixeye.kixmpp.client.KixmppStanzaHandler;
-import com.kixeye.kixmpp.client.module.KixmppModule;
+import com.kixeye.kixmpp.client.module.KixmppClientModule;
+import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 
 /**
  * A module that handles presence info.
  * 
  * @author ebahtijaragic
  */
-public class PresenceKixmppModule implements KixmppModule {
-	private static final Logger logger = LoggerFactory.getLogger(PresenceKixmppModule.class);
+public class PresenceKixmppClientModule implements KixmppClientModule {
+	private static final Logger logger = LoggerFactory.getLogger(PresenceKixmppClientModule.class);
 	
 	private Set<PresenceListener> presenceListeners = Collections.newSetFromMap(new ConcurrentHashMap<PresenceListener, Boolean>());
 	
@@ -59,19 +61,19 @@ public class PresenceKixmppModule implements KixmppModule {
 	}
 
 	/**
-	 * @see com.kixeye.kixmpp.client.module.KixmppModule#install(com.kixeye.kixmpp.client.KixmppClient)
+	 * @see com.kixeye.kixmpp.client.module.KixmppClientModule#install(com.kixeye.kixmpp.client.KixmppClient)
 	 */
 	public void install(KixmppClient client) {
 		this.client = client;
 
-		client.getHandlerRegistry().register("presence", "jabber:client", presenceHandler);
+		client.getEventEngine().register("presence", "jabber:client", presenceHandler);
 	}
 
 	/**
-	 * @see com.kixeye.kixmpp.client.module.KixmppModule#uninstall(com.kixeye.kixmpp.client.KixmppClient)
+	 * @see com.kixeye.kixmpp.client.module.KixmppClientModule#uninstall(com.kixeye.kixmpp.client.KixmppClient)
 	 */
 	public void uninstall(KixmppClient client) {
-		client.getHandlerRegistry().unregister("presence", "jabber:client", presenceHandler);
+		client.getEventEngine().unregister("presence", "jabber:client", presenceHandler);
 	}
 
 	/**
@@ -104,7 +106,7 @@ public class PresenceKixmppModule implements KixmppModule {
     }
 
 	private KixmppStanzaHandler presenceHandler = new KixmppStanzaHandler() {
-		public void handle(Element stanza) {
+		public void handle(Channel channel, Element stanza) {
 			Presence presence = new Presence(stanza.getAttributeValue("from"), 
 					stanza.getAttributeValue("to"), 
 					stanza.getAttributeValue("type"), 

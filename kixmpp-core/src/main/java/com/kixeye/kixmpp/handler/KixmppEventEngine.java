@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server;
+package com.kixeye.kixmpp.handler;
 
 /*
  * #%L
@@ -46,18 +46,61 @@ import com.kixeye.kixmpp.KixmppStreamStart;
  * 
  * @author ebahtijaragic
  */
-public class KixmppHandlerRegistry {
-	private static final Logger logger = LoggerFactory.getLogger(KixmppHandlerRegistry.class);
+public class KixmppEventEngine {
+	private static final Logger logger = LoggerFactory.getLogger(KixmppEventEngine.class);
+	
+	private final String prefix;
 	
 	private final ConcurrentHashMap<Tuple, ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>>> consumers = new ConcurrentHashMap<>();
 
 	private final Reactor reactor;
-
+	
 	/**
 	 * @param reactor
 	 */
-	public KixmppHandlerRegistry(Reactor reactor) {
+	public KixmppEventEngine(Reactor reactor) {
+		this(null, reactor);
+	}
+
+	/**
+	 * @param prefix
+	 * @param reactor
+	 */
+	public KixmppEventEngine(String prefix, Reactor reactor) {
+		assert reactor != null : "Argument 'reactor' cannot be null";
+		
+		this.prefix = prefix;
 		this.reactor = reactor;
+	}
+	
+	/**
+	 * Publishes a stanza.
+	 * 
+	 * @param channel
+	 * @param element
+	 */
+	public void publish(Channel channel, Element stanza) {
+		reactor.notify(getTuple(stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(Tuple.of(channel, stanza)));
+	}
+	
+	/**
+	 * Publishes a stream start event.
+	 * 
+	 * @param channel
+	 * @param streamStart
+	 */
+	public void publish(Channel channel, KixmppStreamStart streamStart) {
+		reactor.notify(getTuple("stream:stream", "http://etherx.jabber.org/streams", "start"), Event.wrap(Tuple.of(channel, streamStart)));
+	}
+	
+	/**
+	 * Publishes a stream end event.
+	 * 
+	 * @param channel
+	 * @param streamEnd
+	 */
+	public void publish(Channel channel, KixmppStreamEnd streamEnd) {
+		reactor.notify(getTuple("stream:stream", "http://etherx.jabber.org/streams", "end"), Event.wrap(Tuple.of(channel, streamEnd)));
 	}
 	
 	/**
@@ -66,8 +109,8 @@ public class KixmppHandlerRegistry {
 	 * @param handler
 	 */
 	public void register(KixmppStreamHandler handler) {
-		Tuple startKey = Tuple.of("stream:stream", "http://etherx.jabber.org/streams", "start");
-		Tuple endKey = Tuple.of("stream:stream", "http://etherx.jabber.org/streams", "end");
+		Tuple startKey = getTuple("stream:stream", "http://etherx.jabber.org/streams", "start");
+		Tuple endKey = getTuple("stream:stream", "http://etherx.jabber.org/streams", "end");
 
 		synchronized (consumers) {
 			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(startKey);
@@ -108,7 +151,7 @@ public class KixmppHandlerRegistry {
 	 * @param handler
 	 */
 	public void unregister(KixmppStreamHandler handler) {
-		Tuple key = Tuple.of("stream:stream", "http://etherx.jabber.org/streams", "start");
+		Tuple key = getTuple("stream:stream", "http://etherx.jabber.org/streams", "start");
 
 		synchronized (consumers) {
 			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(key);
@@ -152,7 +195,7 @@ public class KixmppHandlerRegistry {
 	 */
 	public void register(String qualifiedName, String namespace, KixmppStanzaHandler handler) {
 		synchronized (consumers) {
-			Tuple key = Tuple.of(qualifiedName, namespace);
+			Tuple key = getTuple(qualifiedName, namespace);
 			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(key);
 			
 			if (consumerQueue == null) {
@@ -178,7 +221,7 @@ public class KixmppHandlerRegistry {
 	 */
 	public void unregister(String qualifiedName, String namespace, KixmppStanzaHandler handler) {
 		synchronized (consumers) {
-			Tuple key = Tuple.of(qualifiedName, namespace);
+			Tuple key = getTuple(qualifiedName, namespace);
 			
 			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(key);
 			
@@ -211,6 +254,37 @@ public class KixmppHandlerRegistry {
 			}
 			
 			consumers.clear();
+		}
+	}
+	
+	/**
+	 * Gets a tuple.
+	 * 
+	 * @param qualifiedName
+	 * @param namespace
+	 * @return
+	 */
+	private Tuple getTuple(String qualifiedName, String namespace) {
+		if (prefix != null) {
+			return Tuple.of(prefix, qualifiedName, namespace);
+		} else {
+			return Tuple.of(qualifiedName, namespace);
+		}
+	}
+	
+	/**
+	 * Gets a tuple.
+	 * 
+	 * @param qualifiedName
+	 * @param namespace
+	 * @param action
+	 * @return
+	 */
+	private Tuple getTuple(String qualifiedName, String namespace, String action) {
+		if (prefix != null) {
+			return Tuple.of(prefix, qualifiedName, namespace, action);
+		} else {
+			return Tuple.of(qualifiedName, namespace, action);
 		}
 	}
 	

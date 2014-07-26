@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server.module.bind;
+package com.kixeye.kixmpp.server.module.session;
 
 import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
@@ -9,18 +9,17 @@ import java.util.List;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 
-import com.kixeye.kixmpp.server.KixmppJid;
+import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.KixmppStanzaHandler;
-import com.kixeye.kixmpp.server.module.KixmppModule;
+import com.kixeye.kixmpp.server.module.KixmppServerModule;
 
 /**
- * Handles binds.
+ * Handles sessions.
  * 
  * @author ebahtijaragic
  */
-public class KixmppBindModule implements KixmppModule {
-	public static AttributeKey<KixmppJid> JID = AttributeKey.valueOf("JID");
+public class SessionKixmppServerModule implements KixmppServerModule {
+	public static AttributeKey<Boolean> IS_SESSION_ESTABLISHED = AttributeKey.valueOf("IS_SESSION_ESTABLISHED");
 	
 	private KixmppServer server;
 	
@@ -30,14 +29,14 @@ public class KixmppBindModule implements KixmppModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getHandlerRegistry().register("iq", null, BIND_HANDLER);
+		this.server.getEventEngine().register("iq", null, SESSION_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getHandlerRegistry().unregister("iq", null, BIND_HANDLER);
+		this.server.getEventEngine().unregister("iq", null, SESSION_HANDLER);
 	}
 
 	/**
@@ -53,34 +52,25 @@ public class KixmppBindModule implements KixmppModule {
 		return features;
 	}
 	
-	private KixmppStanzaHandler BIND_HANDLER = new KixmppStanzaHandler() {
+	private KixmppStanzaHandler SESSION_HANDLER = new KixmppStanzaHandler() {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
 		 */
 		public void handle(Channel channel, Element stanza) {
-			Element bind = stanza.getChild("bind", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
+			Element session = stanza.getChild("session", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-session"));
 			
-			if (bind != null) {
-				// handle the bind
-				String resource = bind.getChildText("resource", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
-				
-				if (resource != null) {
-					channel.attr(KixmppBindModule.JID).set(channel.attr(KixmppBindModule.JID).get().withResource(resource));
-				}
+			if (session != null) {
+				channel.attr(IS_SESSION_ESTABLISHED).set(true);
 				
 				Element iq = new Element("iq");
 				iq.setAttribute("type", "result");
+				iq.setAttribute("from", server.getDomain());
 				
 				String id = stanza.getAttributeValue("id");
 				
 				if (id != null) {
 					iq.setAttribute("id", id);
 				}
-				
-				bind = new Element("bind", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
-				bind.addContent(new Element("jid", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind")).setText(channel.attr(KixmppBindModule.JID).get().toString()));
-				
-				iq.addContent(bind);
 				
 				channel.writeAndFlush(iq);
 			}
