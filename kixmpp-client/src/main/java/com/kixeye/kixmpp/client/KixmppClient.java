@@ -155,6 +155,8 @@ public class KixmppClient implements AutoCloseable {
 	 * @param sslContext
 	 */
 	public KixmppClient(EventLoopGroup eventLoopGroup, Environment environment, Reactor reactor, SslContext sslContext) {
+		assert sslContext.isClient() : "The given SslContext must be a client context.";
+		
 		bootstrap = new Bootstrap()
 			.group(eventLoopGroup)
 			.channel(NioSocketChannel.class)
@@ -384,6 +386,19 @@ public class KixmppClient implements AutoCloseable {
     }
     
     /**
+     * Gets the jid of the user.
+     * 
+     * @return
+     */
+    public String getJid() {
+    	if (jid != null) {
+    		return jid;
+    	} else {
+    		return username + "@" + domain + "/" + resource;
+    	}
+    }
+    
+    /**
      * Checks the state and sets it.
      * 
      * @param update
@@ -558,8 +573,9 @@ public class KixmppClient implements AutoCloseable {
 					Element bind = new Element("bind", "urn:ietf:params:xml:ns:xmpp-bind");
 					
 					if (KixmppClient.this.resource != null) {
-						Element resource = new Element("resource");
+						Element resource = new Element("resource", null, "urn:ietf:params:xml:ns:xmpp-bind");
 						resource.setText(KixmppClient.this.resource);
+						bind.addContent(resource);
 					}
 					
 					bindRequest.addContent(bind);

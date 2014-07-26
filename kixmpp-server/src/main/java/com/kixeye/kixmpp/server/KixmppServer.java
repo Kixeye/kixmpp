@@ -36,6 +36,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
+import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map.Entry;
@@ -59,7 +60,14 @@ import reactor.tuple.Tuple;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.server.module.KixmppModule;
+import com.kixeye.kixmpp.server.module.auth.KixmppSaslModule;
+import com.kixeye.kixmpp.server.module.bind.KixmppBindModule;
+import com.kixeye.kixmpp.server.module.features.KixmppFeaturesModule;
+import com.kixeye.kixmpp.server.module.muc.KixmppMucModule;
+import com.kixeye.kixmpp.server.module.presence.KixmppPresenceModule;
+import com.kixeye.kixmpp.server.module.session.KixmppSessionModule;
 
 /**
  * A XMPP server.
@@ -69,10 +77,11 @@ import com.kixeye.kixmpp.server.module.KixmppModule;
 public class KixmppServer implements AutoCloseable {
 	private static final Logger logger = LoggerFactory.getLogger(KixmppServer.class);
 	
-	public static final int DEFAULT_PORT = 5222;
+	public static final InetSocketAddress DEFAULT_SOCKET_ADDRESS = new InetSocketAddress(5222);
 	
-    private final ConcurrentHashMap<KixmppServerOption<?>, Object> serverOptions = new ConcurrentHashMap<KixmppServerOption<?>, Object>();
-    
+	private final InetSocketAddress bindAddress;
+	private final String domain;
+	
 	private final ServerBootstrap bootstrap;
 	
 	private final Environment environment;
@@ -99,10 +108,22 @@ public class KixmppServer implements AutoCloseable {
 	/**
 	 * Creates a new {@link KixmppServer} with the given ssl engine.
 	 * 
+	 * @param domain
 	 * @param sslContext
 	 */
-	public KixmppServer(SslContext sslContext) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, sslContext);
+	public KixmppServer(String domain, SslContext sslContext) {
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, DEFAULT_SOCKET_ADDRESS, domain, sslContext);
+	}
+	
+	/**
+	 * Creates a new {@link KixmppServer} with the given ssl engine.
+	 * 
+	 * @param bindAddress
+	 * @param domain
+	 * @param sslContext
+	 */
+	public KixmppServer(InetSocketAddress bindAddress, String domain, SslContext sslContext) {
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, bindAddress, domain, sslContext);
 	}
 	
 	/**
@@ -112,10 +133,12 @@ public class KixmppServer implements AutoCloseable {
 	 * @param bossGroup
 	 * @param environment
 	 * @param dispatcher
+	 * @param bindAddress
+	 * @param domain
 	 * @param sslContext
 	 */
-	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, String dispatcher, SslContext sslContext) {
-		this(workerGroup, bossGroup, environment, Reactors.reactor(environment, dispatcher), sslContext);
+	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, String dispatcher, InetSocketAddress bindAddress, String domain, SslContext sslContext) {
+		this(workerGroup, bossGroup, environment, Reactors.reactor(environment, dispatcher), bindAddress, domain, sslContext);
 	}
 	
 	/**
@@ -124,9 +147,13 @@ public class KixmppServer implements AutoCloseable {
 	 * @param workerGroup
 	 * @param environment
 	 * @param reactor
+	 * @param bindAddress
+	 * @param domain
 	 * @param sslContext
 	 */
-	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, Reactor reactor, SslContext sslContext) {
+	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, Reactor reactor, InetSocketAddress bindAddress, String domain, SslContext sslContext) {
+		assert sslContext.isServer() : "The given SslContext must be a server context.";
+		
 		bootstrap = new ServerBootstrap()
 			.group(bossGroup, workerGroup)
 			.channel(NioServerSocketChannel.class)
@@ -137,19 +164,19 @@ public class KixmppServer implements AutoCloseable {
 				}
 			});
 
+		this.bindAddress = bindAddress;
+		this.domain = domain;
 		this.handlerRegistry = new KixmppHandlerRegistry(reactor);
 		this.environment = environment;
 		this.reactor = reactor;
 		this.sslContext = sslContext;
-	}
-	
-	/**
-	 * Starts the server.
-	 * 
-	 * @throws Exception
-	 */
-	public Promise<KixmppServer> start() throws Exception {
-		return start(DEFAULT_PORT);
+		
+		this.modulesToRegister.add(KixmppFeaturesModule.class.getName());
+		this.modulesToRegister.add(KixmppSaslModule.class.getName());
+		this.modulesToRegister.add(KixmppBindModule.class.getName());
+		this.modulesToRegister.add(KixmppSessionModule.class.getName());
+		this.modulesToRegister.add(KixmppPresenceModule.class.getName());
+		this.modulesToRegister.add(KixmppMucModule.class.getName());
 	}
 	
 	/**
@@ -158,10 +185,10 @@ public class KixmppServer implements AutoCloseable {
 	 * @param port
 	 * @throws Exception
 	 */
-	public Promise<KixmppServer> start(final int port) throws Exception {
+	public Promise<KixmppServer> start() throws Exception {
 		checkAndSetState(State.STARTING, State.STOPPED);
 		
-		logger.info("Starting Kixmpp Server on port [{}]...", port);
+		logger.info("Starting Kixmpp Server on [{}]...", bindAddress);
 
 		// register all modules
 		for (String moduleClassName : modulesToRegister) {
@@ -170,20 +197,20 @@ public class KixmppServer implements AutoCloseable {
 		
 		final Deferred<KixmppServer, Promise<KixmppServer>> deferred = Promises.defer(environment, reactor.getDispatcher());
 
-		channelFuture.set(bootstrap.bind(port));
+		channelFuture.set(bootstrap.bind(bindAddress));
 		
 		channelFuture.get().addListener(new GenericFutureListener<Future<? super Void>>() {
 			@Override
 			public void operationComplete(Future<? super Void> future) throws Exception {
 				if (future.isSuccess()) {
-					logger.info("Kixmpp Server listening on port [{}]", port);
+					logger.info("Kixmpp Server listening on [{}]", bindAddress);
 					
 					channel.set(channelFuture.get().channel());
 					state.set(State.STARTED);
 					channelFuture.set(null);
 					deferred.accept(KixmppServer.this);
 				} else {
-					logger.error("Unable to start Kixmpp Server on port [{}]", port, future.cause());
+					logger.error("Unable to start Kixmpp Server on [{}]", bindAddress, future.cause());
 					
 					state.set(State.STOPPED);
 					deferred.accept(future.cause());
@@ -249,22 +276,6 @@ public class KixmppServer implements AutoCloseable {
 	}
 	
 	/**
-	 * Sets the servers {@link KixmppServerOption}s.
-	 * 
-	 * @param option
-	 * @param value
-	 * @return
-	 */
-    public <T> KixmppServer serverOption(KixmppServerOption<T> option, T value) {
-    	if (value == null) {
-    		serverOptions.remove(option);
-    	} else {
-    		serverOptions.put(option, value);
-    	}
-    	return this;
-    }
-
-	/**
 	 * Sets Netty {@link ChannelOption}s.
 	 * 
 	 * @param option
@@ -304,10 +315,6 @@ public class KixmppServer implements AutoCloseable {
      */
     @SuppressWarnings("unchecked")
 	public <T extends KixmppModule> T module(Class<T> moduleClass) {
-    	if (!(state.get() == State.STARTED)) {
-			throw new IllegalStateException(String.format("The current state is [%s] but must be [STARTED]", state.get()));
-    	}
-    	
     	T module = (T)modules.get(moduleClass.getName());
     	
     	if (module == null) {
@@ -336,6 +343,20 @@ public class KixmppServer implements AutoCloseable {
     }
     
     /**
+	 * @return the bindAddress
+	 */
+	public InetSocketAddress getBindAddress() {
+		return bindAddress;
+	}
+
+	/**
+	 * @return the domain
+	 */
+	public String getDomain() {
+		return domain;
+	}
+
+	/**
      * Tries to install module.
      * 
      * @param moduleClassName
@@ -394,7 +415,7 @@ public class KixmppServer implements AutoCloseable {
 		public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 			if (msg instanceof Element) {
 				Element stanza = (Element)msg;
-
+				
 				reactor.notify(Tuple.of(stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(Tuple.of(ctx.channel(), stanza)));
 			} else if (msg instanceof KixmppStreamStart) {
 				KixmppStreamStart streamStart = (KixmppStreamStart)msg;

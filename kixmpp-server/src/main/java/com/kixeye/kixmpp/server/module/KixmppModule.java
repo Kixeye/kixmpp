@@ -36,16 +36,16 @@ public interface KixmppModule {
 	/**
 	 * Installs the module.
 	 * 
-	 * @param client
+	 * @param server
 	 */
-	public void install(KixmppServer client);
+	public void install(KixmppServer server);
 	
 	/**
 	 * Uninstalls the module.
 	 * 
-	 * @param client
+	 * @param server
 	 */
-	public void uninstall(KixmppServer client);
+	public void uninstall(KixmppServer server);
 	
 	/**
 	 * Gets a list of features added by this module.

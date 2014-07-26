@@ -53,8 +53,6 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 
 	private static final Logger logger  = LoggerFactory.getLogger(KixmppCodec.class);
 
-	private StAXElementBuilder streamElementBuilder = null;
-	
 	private StAXElementBuilder elementBuilder = null;
 	
 	private InputFactoryImpl inputFactory = new InputFactoryImpl();
@@ -99,8 +97,6 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 				inputFactory.configureForXmlConformance();
 				break;
 		}
-		
-		this.streamElementBuilder = new StAXElementBuilder(true);
 	}
 	
 	/**
@@ -124,18 +120,15 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 			if (streamReader.getDepth() == STANZA_ELEMENT_DEPTH - 1) {
 				if (event == XMLStreamConstants.END_ELEMENT) {
 					out.add(new KixmppStreamEnd());
-				} else if (streamElementBuilder != null) {
+				} else if (event == XMLStreamConstants.START_ELEMENT) {
+					StAXElementBuilder streamElementBuilder = new StAXElementBuilder(true);
+					
 					streamElementBuilder.process(streamReader);
+
+					out.add(new KixmppStreamStart(null));
 				}
 			// only handle events that have element depth of 2 and above (everything under <stream:stream>..)
 			} else if (streamReader.getDepth() >= STANZA_ELEMENT_DEPTH) {
-				// check if stream was published
-				if (streamElementBuilder != null) {
-					out.add(new KixmppStreamStart(streamElementBuilder.getElement()));
-					
-					streamElementBuilder = null;
-				}
-				
 				// if this is the beginning of the element and this is at stanza depth
 				if (event == XMLStreamConstants.START_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
 					elementBuilder = new StAXElementBuilder(true);
@@ -147,7 +140,7 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 					
 					// get the constructed element
 					Element element = elementBuilder.getElement();
-
+					
 		    		out.add(element);
 		    
 		    	// just process the event

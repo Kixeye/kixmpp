@@ -45,6 +45,11 @@
 			<artifactId>kixmpp-core</artifactId>
 			<version>${parent.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>${parent.groupId}</groupId>
+			<artifactId>kixmpp-client</artifactId>
+			<version>${parent.version}</version>
+		</dependency>
 
 		<!-- Reactor -->
 		<dependency>

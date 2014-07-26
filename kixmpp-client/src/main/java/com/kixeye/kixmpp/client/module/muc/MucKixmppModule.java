@@ -97,10 +97,15 @@ public class MucKixmppModule implements KixmppModule {
 	 */
 	public void joinRoom(String roomJid, String nickname) {
 		Element presence = new Element("presence");
+		presence.setAttribute("from", client.getJid());
 		presence.setAttribute("to", roomJid + "/" + nickname);
 
 		Element x = new Element("x", "http://jabber.org/protocol/muc");
 		presence.addContent(x);
+
+		Element history = new Element("history");
+		history.setAttribute("maxstanzas", "0");
+		x.addContent(history);
 		
 		client.sendStanza(presence);
 	}
@@ -112,17 +117,7 @@ public class MucKixmppModule implements KixmppModule {
 	 * @param invitation
 	 */
 	public void joinRoom(MucInvite invitation, String nickname) {
-		Element presence = new Element("presence");
-		presence.setAttribute("to", invitation.getRoomJid() + "/" + nickname);
-
-		Element x = new Element("x", "http://jabber.org/protocol/muc");
-		presence.addContent(x);
-		
-		Element history = new Element("history");
-		history.setAttribute("maxstanzas", "0");
-		x.addContent(history);
-		
-		client.sendStanza(presence);
+		joinRoom(invitation.getRoomJid(), nickname);
 	}
 	
 	/**
@@ -205,21 +200,23 @@ public class MucKixmppModule implements KixmppModule {
 					String language = null;
 					String bodyMessage = null;
 					
-					Element body = stanza.getChild("body");
+					Element body = stanza.getChild("body", Namespace.getNamespace("jabber:client"));
+					
 					if (body != null) {
 						bodyMessage = body.getText();
 						language = body.getAttributeValue("xml:lang");
-					}
-					
-					MucMessage message = new MucMessage(stanza.getAttributeValue("from"), stanza.getAttributeValue("to"), language, bodyMessage);
-					
-					for (MucListener<MucMessage> listener : messageListeners) {
-						try {
-							listener.handle(message);
-						} catch (Exception e) {
-							logger.error("Exception thrown while executing MucInvite listener", e);
+
+						MucMessage message = new MucMessage(stanza.getAttributeValue("from"), stanza.getAttributeValue("to"), language, bodyMessage);
+						
+						for (MucListener<MucMessage> listener : messageListeners) {
+							try {
+								listener.handle(message);
+							} catch (Exception e) {
+								logger.error("Exception thrown while executing MucInvite listener", e);
+							}
 						}
 					}
+					
 					break;
 				case "":
 					// check if invite
