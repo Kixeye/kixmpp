@@ -30,6 +30,7 @@ import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.client.module.KixmppClientModule;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
@@ -107,8 +108,8 @@ public class PresenceKixmppClientModule implements KixmppClientModule {
 
 	private KixmppStanzaHandler presenceHandler = new KixmppStanzaHandler() {
 		public void handle(Channel channel, Element stanza) {
-			Presence presence = new Presence(stanza.getAttributeValue("from"), 
-					stanza.getAttributeValue("to"), 
+			Presence presence = new Presence(KixmppJid.fromRawJid(stanza.getAttributeValue("from")), 
+					KixmppJid.fromRawJid(stanza.getAttributeValue("to")), 
 					stanza.getAttributeValue("type"), 
 					stanza.getChildText("status"), 
 					stanza.getChildText("show"));

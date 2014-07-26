@@ -195,5 +195,4 @@ public class KixmppJid {
 			return false;
 		return true;
 	}
-
 }

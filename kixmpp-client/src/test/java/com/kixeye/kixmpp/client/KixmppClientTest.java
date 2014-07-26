@@ -128,7 +128,6 @@ public class KixmppClientTest {
 			Assert.assertNotNull(client.connect("localhost", port, domain).await(2, TimeUnit.SECONDS));
 			Assert.assertNotNull(client.login(username, password, resource).await(2, TimeUnit.SECONDS));
 			client.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
-			Thread.sleep(1000);
 		}
 	}
 

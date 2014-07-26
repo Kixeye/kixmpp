@@ -1,5 +1,7 @@
 package com.kixeye.kixmpp.client.module.muc;
 
+import com.kixeye.kixmpp.KixmppJid;
+
 /*
  * #%L
  * KIXMPP
@@ -26,16 +28,16 @@ package com.kixeye.kixmpp.client.module.muc;
  * @author ebahtijaragic
  */
 public class MucInvite {
-	private final String from;
-	private final String to;
-	private final String roomJid;
+	private final KixmppJid from;
+	private final KixmppJid to;
+	private final KixmppJid roomJid;
 
 	/**
 	 * @param from
 	 * @param to
 	 * @param roomJid
 	 */
-	public MucInvite(String from, String to, String roomJid) {
+	public MucInvite(KixmppJid from, KixmppJid to, KixmppJid roomJid) {
 		this.from = from;
 		this.to = to;
 		this.roomJid = roomJid;
@@ -44,21 +46,21 @@ public class MucInvite {
 	/**
 	 * @return the from
 	 */
-	public String getFrom() {
+	public KixmppJid getFrom() {
 		return from;
 	}
 
 	/**
 	 * @return the to
 	 */
-	public String getTo() {
+	public KixmppJid getTo() {
 		return to;
 	}
 
 	/**
 	 * @return the roomJid
 	 */
-	public String getRoomJid() {
+	public KixmppJid getRoomJid() {
 		return roomJid;
 	}
 }

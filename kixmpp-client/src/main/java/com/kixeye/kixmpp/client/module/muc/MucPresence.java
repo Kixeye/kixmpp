@@ -20,6 +20,7 @@ package com.kixeye.kixmpp.client.module.muc;
  * #L%
  */
 
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.client.module.presence.Presence;
 
 /**
@@ -28,7 +29,7 @@ import com.kixeye.kixmpp.client.module.presence.Presence;
  * @author ebahtijaragic
  */
 public class MucPresence extends Presence {
-	private final String userJid;
+	private final KixmppJid userJid;
 	private final String affiliation;
 	private final String role;
 
@@ -42,8 +43,8 @@ public class MucPresence extends Presence {
 	 * @param affiliation
 	 * @param role
 	 */
-	public MucPresence(String from, String to, String type, String status,
-			String show, String userJid, String affiliation, String role) {
+	public MucPresence(KixmppJid from, KixmppJid to, String type, String status,
+			String show, KixmppJid userJid, String affiliation, String role) {
 		super(from, to, type, status, show);
 		this.userJid = userJid;
 		this.affiliation = affiliation;
@@ -58,9 +59,9 @@ public class MucPresence extends Presence {
 	 * @param affiliation
 	 * @param role
 	 */
-	public MucPresence(String from, String to, String type, String userJid,
+	public MucPresence(KixmppJid from, KixmppJid to, String type, KixmppJid userJid,
 			String affiliation, String role) {
-		super(from, to, type);
+		super(from, to, type, null, null);
 		this.userJid = userJid;
 		this.affiliation = affiliation;
 		this.role = role;
@@ -69,7 +70,7 @@ public class MucPresence extends Presence {
 	/**
 	 * @return the userJid
 	 */
-	public String getUserJid() {
+	public KixmppJid getUserJid() {
 		return userJid;
 	}
 

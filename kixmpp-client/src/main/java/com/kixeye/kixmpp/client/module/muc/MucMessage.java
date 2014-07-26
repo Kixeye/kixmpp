@@ -1,5 +1,7 @@
 package com.kixeye.kixmpp.client.module.muc;
 
+import com.kixeye.kixmpp.KixmppJid;
+
 /*
  * #%L
  * KIXMPP
@@ -26,8 +28,8 @@ package com.kixeye.kixmpp.client.module.muc;
  * @author ebahtijaragic
  */
 public class MucMessage {
-	private final String from;
-	private final String to;
+	private final KixmppJid from;
+	private final KixmppJid to;
 	private final String language;
 	private final String body;
 
@@ -37,7 +39,7 @@ public class MucMessage {
 	 * @param language
 	 * @param body
 	 */
-	public MucMessage(String from, String to, String language, String body) {
+	public MucMessage(KixmppJid from, KixmppJid to, String language, String body) {
 		this.from = from;
 		this.to = to;
 		this.language = language;
@@ -47,14 +49,14 @@ public class MucMessage {
 	/**
 	 * @return the from
 	 */
-	public String getFrom() {
+	public KixmppJid getFrom() {
 		return from;
 	}
 
 	/**
 	 * @return the to
 	 */
-	public String getTo() {
+	public KixmppJid getTo() {
 		return to;
 	}
 

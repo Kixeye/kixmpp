@@ -1,5 +1,7 @@
 package com.kixeye.kixmpp.client.module.presence;
 
+import com.kixeye.kixmpp.KixmppJid;
+
 /*
  * #%L
  * KIXMPP
@@ -26,8 +28,8 @@ package com.kixeye.kixmpp.client.module.presence;
  * @author ebahtijaragic
  */
 public class Presence {
-	private final String from;
-	private final String to;
+	private final KixmppJid from;
+	private final KixmppJid to;
 	private final String type;
 	private final String status;
 	private final String show;
@@ -39,7 +41,7 @@ public class Presence {
 	 * @param status
 	 * @param show
 	 */
-	public Presence(String from, String to, String type, String status,
+	public Presence(KixmppJid from, KixmppJid to, String type, String status,
 			String show) {
 		this.from = from;
 		this.to = to;
@@ -75,14 +77,14 @@ public class Presence {
 	/**
 	 * @return the from
 	 */
-	public String getFrom() {
+	public KixmppJid getFrom() {
 		return from;
 	}
 
 	/**
 	 * @return the to
 	 */
-	public String getTo() {
+	public KixmppJid getTo() {
 		return to;
 	}
 

@@ -1,5 +1,7 @@
 package com.kixeye.kixmpp.client.module.muc;
 
+import com.kixeye.kixmpp.KixmppJid;
+
 /*
  * #%L
  * KIXMPP
@@ -26,8 +28,8 @@ package com.kixeye.kixmpp.client.module.muc;
  * @author ebahtijaragic
  */
 public class MucJoin {
-	private final String roomJid;
-	private final String userJid;
+	private final KixmppJid roomJid;
+	private final KixmppJid userJid;
 	private final String affiliation;
 	private final String role;
 
@@ -37,8 +39,7 @@ public class MucJoin {
 	 * @param affiliation
 	 * @param role
 	 */
-	public MucJoin(String roomJid, String userJid, String affiliation,
-			String role) {
+	public MucJoin(KixmppJid roomJid, KixmppJid userJid, String affiliation, String role) {
 		this.roomJid = roomJid;
 		this.userJid = userJid;
 		this.affiliation = affiliation;
@@ -48,14 +49,14 @@ public class MucJoin {
 	/**
 	 * @return the roomJid
 	 */
-	public String getRoomJid() {
+	public KixmppJid getRoomJid() {
 		return roomJid;
 	}
 
 	/**
 	 * @return the userJid
 	 */
-	public String getUserJid() {
+	public KixmppJid getUserJid() {
 		return userJid;
 	}
 

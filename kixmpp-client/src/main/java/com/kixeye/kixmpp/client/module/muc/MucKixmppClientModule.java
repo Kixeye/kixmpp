@@ -31,6 +31,7 @@ import org.jdom2.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.client.module.KixmppClientModule;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
@@ -97,7 +98,7 @@ public class MucKixmppClientModule implements KixmppClientModule {
 	 * @param roomJid
 	 * @param nickname
 	 */
-	public void joinRoom(String roomJid, String nickname) {
+	public void joinRoom(KixmppJid roomJid, String nickname) {
 		Element presence = new Element("presence");
 		presence.setAttribute("from", client.getJid());
 		presence.setAttribute("to", roomJid + "/" + nickname);
@@ -128,10 +129,10 @@ public class MucKixmppClientModule implements KixmppClientModule {
 	 * @param roomJid
 	 * @param roomMessage
 	 */
-	public void sendRoomMessage(String roomJid, String roomMessage) {
+	public void sendRoomMessage(KixmppJid roomJid, String roomMessage, String nickname) {
 		Element message = new Element("message");
-		message.setAttribute("to", roomJid);
-		message.setAttribute("from", roomJid);
+		message.setAttribute("from", roomJid + "/" + nickname);
+		message.setAttribute("to", roomJid.toString());
 		message.setAttribute("type", "groupchat");
 		
 		Element bodyElement = new Element("body");
@@ -168,10 +169,10 @@ public class MucKixmppClientModule implements KixmppClientModule {
 				Element inItem = inX.getChild("item", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
 				
 				if (inItem != null) {
-					String from = stanza.getAttributeValue("from");
+					KixmppJid from = KixmppJid.fromRawJid(stanza.getAttributeValue("from"));
 					
-					MucJoin message = new MucJoin(from.substring(0, from.indexOf("/")), 
-							inItem.getAttributeValue("jid"), 
+					MucJoin message = new MucJoin(from.withoutResource(), 
+							from, 
 							inItem.getAttributeValue("affiliation"), 
 							inItem.getAttributeValue("role"));
 					
@@ -209,7 +210,7 @@ public class MucKixmppClientModule implements KixmppClientModule {
 						bodyMessage = body.getText();
 						language = body.getAttributeValue("xml:lang");
 
-						MucMessage message = new MucMessage(stanza.getAttributeValue("from"), stanza.getAttributeValue("to"), language, bodyMessage);
+						MucMessage message = new MucMessage(KixmppJid.fromRawJid(stanza.getAttributeValue("from")), KixmppJid.fromRawJid(stanza.getAttributeValue("to")), language, bodyMessage);
 						
 						for (MucListener<MucMessage> listener : messageListeners) {
 							try {
@@ -224,9 +225,9 @@ public class MucKixmppClientModule implements KixmppClientModule {
 				case "":
 					// check if invite
 					for (Element invitation : stanza.getChildren("x", Namespace.getNamespace("jabber:x:conference"))) {
-						String roomJid = invitation.getAttributeValue("jid");
+						KixmppJid roomJid = KixmppJid.fromRawJid(invitation.getAttributeValue("jid"));
 						
-						MucInvite invite = new MucInvite(stanza.getAttributeValue("from"), stanza.getAttributeValue("to"), roomJid);
+						MucInvite invite = new MucInvite(KixmppJid.fromRawJid(stanza.getAttributeValue("from")), KixmppJid.fromRawJid(stanza.getAttributeValue("to")), roomJid);
 						
 						for (MucListener<MucInvite> listener : invitationListeners) {
 							try {
