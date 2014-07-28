@@ -35,7 +35,7 @@ public class KixmppJid {
 	 * @param domain
 	 */
 	public KixmppJid(String node, String domain) {
-		this(node, domain, domain);
+		this(node, domain, null);
 	}
 
 	/**
