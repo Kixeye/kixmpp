@@ -28,9 +28,7 @@ import io.netty.util.AttributeKey;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.jdom2.Element;
 
@@ -48,7 +46,7 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 public class SaslKixmppServerModule implements KixmppServerModule {
 	public static AttributeKey<Boolean> IS_AUTHENTICATED = AttributeKey.valueOf("IS_AUTHENTICATED");
 	
-	private Map<String, String> users = new ConcurrentHashMap<>();
+	private AuthenticationService authenticationService = new InMemoryAuthenticationService();
 	
 	private KixmppServer server;
 	
@@ -87,19 +85,19 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 	}
 	
 	/**
-	 * Adds a user.
+	 * @return the authenticationService
 	 */
-	public void addUser(String username, String password) {
-		users.put(username, password);
+	public AuthenticationService getAuthenticationService() {
+		return authenticationService;
 	}
-	
+
 	/**
-	 * Removes a user.
+	 * @param authenticationService the authenticationService to set
 	 */
-	public void removeUser(String username) {
-		users.remove(username);
+	public void setAuthenticationService(AuthenticationService authenticationService) {
+		this.authenticationService = authenticationService;
 	}
-	
+
 	private KixmppStanzaHandler AUTH_HANDLER = new KixmppStanzaHandler() {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
@@ -118,9 +116,7 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 				if (credentialsSplit.length > 1) {
 					String username = credentialsSplit[1];
 					
-					String password = users.get(username);
-					
-					if (password != null && password.equals(credentialsSplit[2])) {
+					if (authenticationService.authenticate(username, credentialsSplit[2])) {
 						channel.attr(IS_AUTHENTICATED).set(true);
 						channel.attr(BindKixmppServerModule.JID).set(new KixmppJid(username, server.getDomain(), UUID.randomUUID().toString().replace("-", "")));
 						

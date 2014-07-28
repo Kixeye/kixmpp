@@ -53,7 +53,9 @@ import com.kixeye.kixmpp.client.module.muc.MucMessage;
 import com.kixeye.kixmpp.client.module.presence.Presence;
 import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceListener;
+import com.kixeye.kixmpp.server.module.auth.InMemoryAuthenticationService;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
+import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
 
 /**
  * Tests the {@link KixmppServer}
@@ -98,7 +100,8 @@ public class KixmppServerTest {
 		try (KixmppServer server = new KixmppServer("testChat", SslContext.newServerContext(certChainFile, keyFile))) {
 			Assert.assertNotNull(server.start().await(2, TimeUnit.SECONDS));
 			
-			server.module(SaslKixmppServerModule.class).addUser("testUser", "testPassword");
+			((InMemoryAuthenticationService)server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
+			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
 			
 			try (KixmppClient client = new KixmppClient(SslContext.newClientContext())) {
 				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();

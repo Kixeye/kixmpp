@@ -24,8 +24,8 @@ import io.netty.channel.Channel;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import org.jdom2.Element;
 import org.jdom2.Namespace;
@@ -43,7 +43,7 @@ import com.kixeye.kixmpp.server.module.KixmppServerModule;
 public class MucKixmppServerModule implements KixmppServerModule {
 	private KixmppServer server;
 	
-	private Map<KixmppJid, MucRoom> rooms = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<String, MucService> services = new ConcurrentHashMap<>();
 	
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#install(com.kixeye.kixmpp.server.KixmppServer)
@@ -62,7 +62,41 @@ public class MucKixmppServerModule implements KixmppServerModule {
 		this.server.getEventEngine().unregister("presence", null, JOIN_ROOM_HANDLER);
 		this.server.getEventEngine().unregister("message", null, ROOM_MESSAGE_HANDLER);
 	}
+	
+	/**
+	 * Adds a {@link InMemoryMucService}
+	 * 
+	 * @param name
+	 * @param service
+	 * @return
+	 */
+	public MucService addService(String name) {
+		return addService(name, new InMemoryMucService(name + "." + server.getDomain()));
+	}
 
+	/**
+	 * Adds a {@link MucService}.
+	 * 
+	 * @param name
+	 * @param service
+	 * @return
+	 */
+	public MucService addService(String name, MucService service) {
+		MucService prevService = services.putIfAbsent(name, service);
+		
+		return prevService == null ? service : prevService;
+	}
+	
+	/**
+	 * Gets a {@link MucService}.
+	 * 
+	 * @param name
+	 * @return
+	 */
+	public MucService getService(String name) {
+		return services.get(name);
+	}
+	
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures()
 	 */
@@ -79,20 +113,16 @@ public class MucKixmppServerModule implements KixmppServerModule {
 			
 			if (x != null) {
 				KixmppJid fullRoomJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
-				KixmppJid roomJid = fullRoomJid.withoutResource();
 				
-				MucRoom room = null;
+				MucService service = services.get(fullRoomJid.getDomain().split(Pattern.quote("."))[0]);
 				
-				synchronized (roomJid.getBaseJid().intern()) {
-					room = rooms.get(roomJid);
+				if (service != null) {
+					MucRoom room = service.getRoom(fullRoomJid.getNode());
 					
-					if (room == null) {
-						room = new MucRoom(roomJid);
-						rooms.put(roomJid, room);
-					}
-				}
-				
-				room.join(channel, fullRoomJid.getResource());
+					if (room != null) {
+						room.join(channel, fullRoomJid.getResource());
+					} // TODO handle else
+				} // TODO handle else
 			}
 		}
 	};
@@ -103,10 +133,16 @@ public class MucKixmppServerModule implements KixmppServerModule {
 		 */
 		public void handle(Channel channel, Element stanza) {
 			if ("groupchat".equals(stanza.getAttributeValue("type"))) {
-				MucRoom room = rooms.get(KixmppJid.fromRawJid(stanza.getAttributeValue("to")).withoutResource());
+				KixmppJid fullRoomJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
 
-				if (room != null) {
-					room.broadcast(channel, stanza);
+				MucService service = services.get(fullRoomJid.getDomain().split(Pattern.quote("."))[0]);
+				
+				if (service != null) {
+					MucRoom room = service.getRoom(fullRoomJid.getNode());
+
+					if (room != null) {
+						room.broadcast(channel, stanza);
+					} // TODO handle else
 				} // TODO handle else
 			}
 		}

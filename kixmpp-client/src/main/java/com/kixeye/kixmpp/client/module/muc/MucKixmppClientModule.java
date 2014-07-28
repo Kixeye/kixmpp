@@ -106,7 +106,7 @@ public class MucKixmppClientModule implements KixmppClientModule {
 		Element x = new Element("x", "http://jabber.org/protocol/muc");
 		presence.addContent(x);
 
-		Element history = new Element("history");
+		Element history = new Element("history", "http://jabber.org/protocol/muc");
 		history.setAttribute("maxstanzas", "0");
 		x.addContent(history);
 		
