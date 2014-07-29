@@ -122,11 +122,32 @@ public class MucRoom {
 				message.setAttribute("from", roomJid.withResource(channelToNickname.get(channel)).toString());
 				message.setAttribute("to", userChannel.attr(BindKixmppServerModule.JID).get().toString());
 				message.setAttribute("type", "groupchat");
-				message.addContent(body);
+				message.addContent(body.clone());
 				
 				userChannel.writeAndFlush(message);
 			}
 		}
+	}
+	
+	/**
+	 * Sends an invitation for a user.
+	 */
+	public void sendInvite(KixmppJid from, Channel userChannelToInvite, String reason) {
+		Element message = new Element("message");
+		message.setAttribute("to", userChannelToInvite.attr(BindKixmppServerModule.JID).get().getFullJid());
+		if (from != null) {
+			message.setAttribute("from", from.getFullJid());
+		}
+		
+		Element x = new Element("x", Namespace.getNamespace("jabber:x:conference"));
+		x.setAttribute("jid", roomJid.getFullJid());
+		if (reason != null) {
+			x.setAttribute("reason", reason);
+		}
+		
+		message.addContent(x);
+		
+		userChannelToInvite.writeAndFlush(message);
 	}
 	
 	private class CloseChannelListener implements GenericFutureListener<Future<? super Void>> {

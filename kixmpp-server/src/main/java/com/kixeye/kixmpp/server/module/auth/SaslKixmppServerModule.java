@@ -74,7 +74,7 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 		
 		Element mechanisms = new Element("mechanisms", null, "urn:ietf:params:xml:ns:xmpp-sasl");
 		
-		Element plainMechanism = new Element("mechanism");
+		Element plainMechanism = new Element("mechanism", "urn:ietf:params:xml:ns:xmpp-sasl");
 		plainMechanism.setText("PLAIN");
 		
 		mechanisms.addContent(plainMechanism);

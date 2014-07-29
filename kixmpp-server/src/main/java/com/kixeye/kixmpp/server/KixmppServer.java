@@ -65,6 +65,7 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import com.kixeye.kixmpp.server.module.features.FeaturesKixmppServerModule;
 import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
 import com.kixeye.kixmpp.server.module.presence.PresenceKixmppServerModule;
+import com.kixeye.kixmpp.server.module.roster.RosterKixmppServerModule;
 import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
 
 /**
@@ -150,7 +151,9 @@ public class KixmppServer implements AutoCloseable {
 	 * @param sslContext
 	 */
 	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, Reactor reactor, InetSocketAddress bindAddress, String domain, SslContext sslContext) {
-		assert sslContext.isServer() : "The given SslContext must be a server context.";
+		if (sslContext != null) {
+			assert sslContext.isServer() : "The given SslContext must be a server context.";
+		}
 		
 		bootstrap = new ServerBootstrap()
 			.group(bossGroup, workerGroup)
@@ -175,6 +178,7 @@ public class KixmppServer implements AutoCloseable {
 		this.modulesToRegister.add(SessionKixmppServerModule.class.getName());
 		this.modulesToRegister.add(PresenceKixmppServerModule.class.getName());
 		this.modulesToRegister.add(MucKixmppServerModule.class.getName());
+		this.modulesToRegister.add(RosterKixmppServerModule.class.getName());
 	}
 	
 	/**
@@ -436,6 +440,13 @@ public class KixmppServer implements AutoCloseable {
 		@Override
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 			logger.debug("Channel [{}] disconnected.", ctx.channel());
+		}
+		
+		@Override
+		public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+			logger.error("Unexpected exception.", cause);
+			
+			ctx.close();
 		}
 	}
 }

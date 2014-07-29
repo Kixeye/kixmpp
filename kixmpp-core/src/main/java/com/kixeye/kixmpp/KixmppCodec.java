@@ -108,46 +108,71 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 			logger.debug("Received: [{}]", in.toString(StandardCharsets.UTF_8));
 		}
 		
+		int retryCount = 0;
+		Exception thrownException = null;
+		
 		// feed the data into the async xml input feeded
 		byte[] data = new byte[in.readableBytes()];
 		in.readBytes(data);
-		asyncInputFeeder.feedInput(data, 0, data.length);
-
-		int event = -1;
 		
-		while (isValidEvent(event = streamReader.next())) {
-			// handle stream start/end
-			if (streamReader.getDepth() == STANZA_ELEMENT_DEPTH - 1) {
-				if (event == XMLStreamConstants.END_ELEMENT) {
-					out.add(new KixmppStreamEnd());
-				} else if (event == XMLStreamConstants.START_ELEMENT) {
-					StAXElementBuilder streamElementBuilder = new StAXElementBuilder(true);
-					
-					streamElementBuilder.process(streamReader);
-
-					out.add(new KixmppStreamStart(null));
+		while (retryCount < 2) {
+			try {
+				asyncInputFeeder.feedInput(data, 0, data.length);
+				
+				int event = -1;
+				
+				while (isValidEvent(event = streamReader.next())) {
+					// handle stream start/end
+					if (streamReader.getDepth() == STANZA_ELEMENT_DEPTH - 1) {
+						if (event == XMLStreamConstants.END_ELEMENT) {
+							out.add(new KixmppStreamEnd());
+						} else if (event == XMLStreamConstants.START_ELEMENT) {
+							StAXElementBuilder streamElementBuilder = new StAXElementBuilder(true);
+							
+							streamElementBuilder.process(streamReader);
+		
+							out.add(new KixmppStreamStart(null));
+						}
+					// only handle events that have element depth of 2 and above (everything under <stream:stream>..)
+					} else if (streamReader.getDepth() >= STANZA_ELEMENT_DEPTH) {
+						// if this is the beginning of the element and this is at stanza depth
+						if (event == XMLStreamConstants.START_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
+							elementBuilder = new StAXElementBuilder(true);
+							elementBuilder.process(streamReader);
+							
+						// if this is the ending of the element and this is at stanza depth
+					    } else if (event == XMLStreamConstants.END_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
+							elementBuilder.process(streamReader);
+							
+							// get the constructed element
+							Element element = elementBuilder.getElement();
+							
+				    		out.add(element);
+				    
+				    	// just process the event
+					    } else {
+							elementBuilder.process(streamReader);
+					    }
+					}
 				}
-			// only handle events that have element depth of 2 and above (everything under <stream:stream>..)
-			} else if (streamReader.getDepth() >= STANZA_ELEMENT_DEPTH) {
-				// if this is the beginning of the element and this is at stanza depth
-				if (event == XMLStreamConstants.START_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
-					elementBuilder = new StAXElementBuilder(true);
-					elementBuilder.process(streamReader);
-					
-				// if this is the ending of the element and this is at stanza depth
-			    } else if (event == XMLStreamConstants.END_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
-					elementBuilder.process(streamReader);
-					
-					// get the constructed element
-					Element element = elementBuilder.getElement();
-					
-		    		out.add(element);
-		    
-		    	// just process the event
-			    } else {
-					elementBuilder.process(streamReader);
-			    }
+				
+				break;
+			} catch (Exception e) {
+				retryCount++;
+				
+				thrownException = e;
+				
+				try {
+					streamReader.close();
+				} finally {
+					streamReader = inputFactory.createAsyncXMLStreamReader();
+					asyncInputFeeder = streamReader.getInputFeeder();
+				}
 			}
+		}
+		
+		if (retryCount > 1) {
+			throw thrownException;
 		}
 	}
 	
