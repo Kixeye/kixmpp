@@ -58,6 +58,7 @@ import reactor.core.spec.Reactors;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
@@ -435,11 +436,15 @@ public class KixmppServer implements AutoCloseable {
 		@Override
 		public void channelActive(ChannelHandlerContext ctx) throws Exception {
 			logger.debug("Channel [{}] connected.", ctx.channel());
+			
+			eventEngine.publishConnected(ctx.channel());
 		}
 		
 		@Override
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 			logger.debug("Channel [{}] disconnected.", ctx.channel());
+
+			eventEngine.publishDisconnected(ctx.channel());
 		}
 		
 		@Override

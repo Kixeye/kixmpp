@@ -21,12 +21,9 @@ package com.kixeye.kixmpp.server.module.muc;
  */
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.gs.collections.impl.factory.Lists;
 import com.kixeye.kixmpp.KixmppJid;
 
 /**

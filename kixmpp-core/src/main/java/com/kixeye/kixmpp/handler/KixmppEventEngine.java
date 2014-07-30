@@ -84,6 +84,24 @@ public class KixmppEventEngine {
 	}
 	
 	/**
+	 * Publishes that a channel has connected.
+	 * 
+	 * @param channel
+	 */
+	public void publishConnected(Channel channel) {
+		reactor.notify(getTuple("connection", "start"), Event.wrap(Tuple.of(channel)));
+	}
+	
+	/**
+	 * Publishes that a channel has disconnected.
+	 * 
+	 * @param channel
+	 */
+	public void publishDisconnected(Channel channel) {
+		reactor.notify(getTuple("connection", "end"), Event.wrap(Tuple.of(channel)));
+	}
+	
+	/**
 	 * Publishes a stream start event.
 	 * 
 	 * @param channel
@@ -101,6 +119,89 @@ public class KixmppEventEngine {
 	 */
 	public void publish(Channel channel, KixmppStreamEnd streamEnd) {
 		reactor.notify(getTuple("stream:stream", "http://etherx.jabber.org/streams", "end"), Event.wrap(Tuple.of(channel, streamEnd)));
+	}
+	
+	/**
+	 * Registers a handler to listen to connection events.
+	 * 
+	 * @param handler
+	 */
+	public void register(KixmppConnectionHandler handler) {
+		Tuple startKey = getTuple("connection", "start");
+		Tuple endKey = getTuple("connection", "end");
+
+		synchronized (consumers) {
+			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(startKey);
+			
+			if (consumerQueue == null) {
+				ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> newConsumerQueue = new ConcurrentLinkedQueue<>();
+				
+				consumerQueue = consumers.putIfAbsent(startKey, newConsumerQueue);
+				
+	            if (consumerQueue == null) {
+	            	consumerQueue = newConsumerQueue;
+	            }
+	        }
+			
+			consumerQueue.offer(reactor.on(Selectors.$(startKey), new ConnectionStartHandlerForwardingConsumer(handler)));
+			
+			consumerQueue = consumers.get(endKey);
+			
+			if (consumerQueue == null) {
+				ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> newConsumerQueue = new ConcurrentLinkedQueue<>();
+				
+				consumerQueue = consumers.putIfAbsent(endKey, newConsumerQueue);
+				
+	            if (consumerQueue == null) {
+	            	consumerQueue = newConsumerQueue;
+	            }
+	        }
+			
+			consumerQueue.offer(reactor.on(Selectors.$(endKey), new ConnectionEndHandlerForwardingConsumer(handler)));
+		}
+	}
+	
+
+	/**
+	 * Unregisters a connection handler.
+	 * 
+	 * @param handler
+	 */
+	public void unregister(KixmppConnectionHandler handler) {
+		Tuple startKey = getTuple("connection", "start");
+		Tuple endKey = getTuple("connection", "end");
+
+		synchronized (consumers) {
+			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(startKey);
+			
+			if (consumerQueue != null) {
+				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
+				
+				while (iterator.hasNext()) {
+					Registration<Consumer<Event<Tuple>>> registration = iterator.next();
+					
+					if (registration.getObject() == handler) {
+						iterator.remove();
+						registration.cancel();
+					}
+				}
+			}
+			
+			consumerQueue = consumers.get(endKey);
+			
+			if (consumerQueue != null) {
+				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
+				
+				while (iterator.hasNext()) {
+					Registration<Consumer<Event<Tuple>>> registration = iterator.next();
+					
+					if (registration.getObject() == handler) {
+						iterator.remove();
+						registration.cancel();
+					}
+				}
+			}
+		}
 	}
 	
 	/**
@@ -146,15 +247,14 @@ public class KixmppEventEngine {
 	/**
 	 * Unregisters a stream handler.
 	 * 
-	 * @param qualifiedName
-	 * @param namespace
 	 * @param handler
 	 */
 	public void unregister(KixmppStreamHandler handler) {
-		Tuple key = getTuple("stream:stream", "http://etherx.jabber.org/streams", "start");
+		Tuple startKey = getTuple("stream:stream", "http://etherx.jabber.org/streams", "start");
+		Tuple endKey = getTuple("stream:stream", "http://etherx.jabber.org/streams", "end");
 
 		synchronized (consumers) {
-			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(key);
+			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(startKey);
 			
 			if (consumerQueue != null) {
 				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
@@ -169,7 +269,7 @@ public class KixmppEventEngine {
 				}
 			}
 			
-			consumerQueue = consumers.get(key);
+			consumerQueue = consumers.get(endKey);
 			
 			if (consumerQueue != null) {
 				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
@@ -354,6 +454,54 @@ public class KixmppEventEngine {
 		public void accept(Event<Tuple> t) {
 			try {
 				handler.handleStreamEnd((Channel)t.getData().toArray()[0], (KixmppStreamEnd)t.getData().toArray()[1]);
+			} catch (Exception e) {
+				logger.error("Error while executing handler", e);
+			}
+		}
+	}
+	
+	/**
+	 * A consumer that forwards the connection start to a handler.
+	 * 
+	 * @author ebahtijaragic
+	 */
+	private static class ConnectionStartHandlerForwardingConsumer implements Consumer<Event<Tuple>> {
+		private final KixmppConnectionHandler handler;
+		
+		/**
+		 * @param handler
+		 */
+		public ConnectionStartHandlerForwardingConsumer(KixmppConnectionHandler handler) {
+			this.handler = handler;
+		}
+
+		public void accept(Event<Tuple> t) {
+			try {
+				handler.handleConnected((Channel)t.getData().toArray()[0]);
+			} catch (Exception e) {
+				logger.error("Error while executing handler", e);
+			}
+		}
+	}
+	
+	/**
+	 * A consumer that forwards the stream end to a handler.
+	 * 
+	 * @author ebahtijaragic
+	 */
+	private static class ConnectionEndHandlerForwardingConsumer implements Consumer<Event<Tuple>> {
+		private final KixmppConnectionHandler handler;
+		
+		/**
+		 * @param handler
+		 */
+		public ConnectionEndHandlerForwardingConsumer(KixmppConnectionHandler handler) {
+			this.handler = handler;
+		}
+
+		public void accept(Event<Tuple> t) {
+			try {
+				handler.handleDisconnected((Channel)t.getData().toArray()[0]);
 			} catch (Exception e) {
 				logger.error("Error while executing handler", e);
 			}

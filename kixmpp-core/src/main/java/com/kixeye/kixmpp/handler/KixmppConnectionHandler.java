@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server.module.muc;
+package com.kixeye.kixmpp.handler;
 
 /*
  * #%L
@@ -20,40 +20,25 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
-import java.util.List;
+import io.netty.channel.Channel;
 
 /**
- * A service that handles MUCs.
+ * Handles connection events.
  * 
  * @author ebahtijaragic
  */
-public interface MucService {
-
-    /**
-     * Get all the {@link MucRoom}s.
-     * @return
-     */
-    public List<MucRoom> getRooms();
-
-    /**
-     * Broadcast the given messages to all {@link MucRoom}.
-     * @param messages
-     */
-    public void broadcast(String...messages);
+public interface KixmppConnectionHandler {
+	/**
+	 * Handles a channel connection.
+	 * 
+	 * @param channel
+	 */
+	public void handleConnected(Channel channel);
 
 	/**
-	 * Adds a {@link MucRoom}.
+	 * Handles a channel disconnection.
 	 * 
-	 * @param name
-	 * @return
+	 * @param channel
 	 */
-	public MucRoom addRoom(String name);
-	
-	/**
-	 * Gets a {@link MucRoom}.
-	 * 
-	 * @param name
-	 * @return
-	 */
-	public MucRoom getRoom(String name);
+	public void handleDisconnected(Channel channel);
 }
