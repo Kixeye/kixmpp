@@ -20,8 +20,13 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.gs.collections.impl.factory.Lists;
 import com.kixeye.kixmpp.KixmppJid;
 
 /**
@@ -41,7 +46,19 @@ public class InMemoryMucService implements MucService {
 		this.serviceDomain = serviceDomain;
 	}
 
-	/**
+    @Override
+    public List<MucRoom> getRooms() {
+        return new ArrayList<>(rooms.values());
+    }
+
+    @Override
+    public void broadcast(String... messages) {
+        for(MucRoom room:rooms.values()){
+            room.broadcast(messages);
+        }
+    }
+
+    /**
 	 * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String)
 	 */
 	public MucRoom addRoom(String name) {

@@ -20,12 +20,28 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
+import java.util.Collection;
+import java.util.List;
+
 /**
  * A service that handles MUCs.
  * 
  * @author ebahtijaragic
  */
 public interface MucService {
+
+    /**
+     * Get all the {@link MucRoom}s.
+     * @return
+     */
+    public List<MucRoom> getRooms();
+
+    /**
+     * Broadcast the given messages to all {@link MucRoom}.
+     * @param messages
+     */
+    public void broadcast(String...messages);
+
 	/**
 	 * Adds a {@link MucRoom}.
 	 * 
