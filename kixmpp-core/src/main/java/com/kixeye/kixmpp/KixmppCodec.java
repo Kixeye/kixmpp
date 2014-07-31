@@ -139,11 +139,17 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 						if (event == XMLStreamConstants.START_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
 							elementBuilder = new StAXElementBuilder(true);
 							elementBuilder.process(streamReader);
+
+							// get the constructed element
+							Element element = elementBuilder.getElement();
 							
+							if ("stream:stream".equals(element.getQualifiedName())) {
+								throw new RuntimeException("Starting a new stream.");
+							}
 						// if this is the ending of the element and this is at stanza depth
 					    } else if (event == XMLStreamConstants.END_ELEMENT && streamReader.getDepth() == STANZA_ELEMENT_DEPTH) {
 							elementBuilder.process(streamReader);
-							
+
 							// get the constructed element
 							Element element = elementBuilder.getElement();
 							

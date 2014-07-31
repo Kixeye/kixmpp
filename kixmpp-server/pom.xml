@@ -130,5 +130,17 @@
 			<version>1.50</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.igniterealtime.smack</groupId>
+			<artifactId>smack-core</artifactId>
+			<version>4.0.2</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.igniterealtime.smack</groupId>
+			<artifactId>smack-tcp</artifactId>
+			<version>4.0.2</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 </project>

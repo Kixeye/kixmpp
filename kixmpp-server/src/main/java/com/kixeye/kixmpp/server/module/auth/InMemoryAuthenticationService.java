@@ -35,7 +35,7 @@ public class InMemoryAuthenticationService implements AuthenticationService {
 	 * Adds a user.
 	 */
 	public void addUser(String username, String password) {
-		users.put(username, password);
+		users.put(username.toLowerCase(), password);
 	}
 	
 	/**
@@ -49,6 +49,6 @@ public class InMemoryAuthenticationService implements AuthenticationService {
 	 * @see com.kixeye.kixmpp.server.module.auth.AuthenticationService#authenticate(java.lang.String, java.lang.String)
 	 */
 	public boolean authenticate(String username, String password) {
-		return password.equals(users.get(username));
+		return password.equals(users.get(username.toLowerCase()));
 	}
 }

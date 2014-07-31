@@ -28,6 +28,7 @@ import java.util.List;
 
 import org.jdom2.Element;
 
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
@@ -72,9 +73,20 @@ public class PresenceKixmppServerModule implements KixmppServerModule {
 		 */
 		public void handle(Channel channel, Element stanza) {
 			if (stanza.getAttributeValue("to") == null) {
+				KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
+				
 				Element presence = new Element("presence");
-				presence.setAttribute("from", channel.attr(BindKixmppServerModule.JID).get().toString());
-				presence.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
+
+				String id = stanza.getAttributeValue("id");
+				
+				if (id != null) {
+					presence.setAttribute("id", id);
+				}
+				
+				if (jid != null) {
+					presence.setAttribute("from", channel.attr(BindKixmppServerModule.JID).get().toString());
+					presence.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
+				}
 				
 				channel.writeAndFlush(presence);
 			}
