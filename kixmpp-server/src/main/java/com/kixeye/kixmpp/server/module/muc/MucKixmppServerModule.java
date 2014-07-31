@@ -71,7 +71,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	 * @return
 	 */
 	public MucService addService(String name) {
-		return addService(name, new InMemoryMucService(name + "." + server.getDomain()));
+		return addService(name.toLowerCase(), new InMemoryMucService(name + "." + server.getDomain()));
 	}
 
 	/**
@@ -82,7 +82,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	 * @return
 	 */
 	public MucService addService(String name, MucService service) {
-		MucService prevService = services.putIfAbsent(name, service);
+		MucService prevService = services.putIfAbsent(name.toLowerCase(), service);
 		
 		return prevService == null ? service : prevService;
 	}

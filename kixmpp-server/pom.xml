@@ -142,5 +142,11 @@
 			<version>4.0.2</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.igniterealtime.smack</groupId>
+			<artifactId>smack-extensions</artifactId>
+			<version>4.0.2</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 </project>

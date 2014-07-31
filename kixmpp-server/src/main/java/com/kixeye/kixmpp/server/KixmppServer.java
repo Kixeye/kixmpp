@@ -166,7 +166,7 @@ public class KixmppServer implements AutoCloseable {
 			});
 
 		this.bindAddress = bindAddress;
-		this.domain = domain;
+		this.domain = domain.toLowerCase();
 		this.eventEngine = new KixmppEventEngine(reactor);
 		this.environment = environment;
 		this.reactor = reactor;

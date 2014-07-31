@@ -41,13 +41,14 @@ import org.bouncycastle.openssl.jcajce.JcaMiscPEMGenerator;
 import org.bouncycastle.openssl.jcajce.JcaPKCS8Generator;
 import org.bouncycastle.util.io.pem.PemWriter;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
-import org.jivesoftware.smack.Chat;
-import org.jivesoftware.smack.ChatManager;
 import org.jivesoftware.smack.ConnectionConfiguration;
-import org.jivesoftware.smack.MessageListener;
+import org.jivesoftware.smack.PacketListener;
+import org.jivesoftware.smack.SmackException.NotConnectedException;
 import org.jivesoftware.smack.XMPPConnection;
 import org.jivesoftware.smack.packet.Message;
+import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
+import org.jivesoftware.smackx.muc.MultiUserChat;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -204,15 +205,29 @@ public class KixmppServerTest {
 				
 				final LinkedBlockingQueue<Message> messages = new LinkedBlockingQueue<>();
 				
-				MessageListener messageListener = new MessageListener() {
-					public void processMessage(Chat chat, Message message) {
-						messages.offer(message);
+				PacketListener messageListener = new PacketListener() {
+					public void processPacket(Packet packet) throws NotConnectedException {
+						messages.offer((Message)packet);
 					}
 				};
 				
-				Chat chat = ChatManager.getInstanceFor(connection).createChat("someRoom@conference.testChat", messageListener);
+				MultiUserChat chat = new MultiUserChat(connection, "someRoom@conference.testChat");
+				chat.addMessageListener(messageListener);
+				chat.join("testNick");
 				
 				chat.sendMessage("hello!");
+				
+				Message message = messages.poll(2, TimeUnit.SECONDS);
+				
+				Assert.assertNotNull(message);
+
+				if (null == message.getBody() || "".equals(message.getBody().trim())) {
+					message = messages.poll(2, TimeUnit.SECONDS);
+	
+					Assert.assertNotNull(message);
+					
+					Assert.assertEquals("hello!", message.getBody());
+				}
 			} finally {
 				connection.disconnect();
 			}

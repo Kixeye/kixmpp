@@ -40,6 +40,8 @@ public class InMemoryMucService implements MucService {
 	 * @param serviceDomain
 	 */
 	public InMemoryMucService(String serviceDomain) {
+		serviceDomain = serviceDomain.toLowerCase();
+		
 		this.serviceDomain = serviceDomain;
 	}
 
@@ -59,6 +61,8 @@ public class InMemoryMucService implements MucService {
 	 * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String)
 	 */
 	public MucRoom addRoom(String name) {
+		name = name.toLowerCase();
+		
 		MucRoom mucRoom = rooms.get(name);
 		
 		if (mucRoom == null) {
@@ -78,6 +82,8 @@ public class InMemoryMucService implements MucService {
 	 * @see com.kixeye.kixmpp.server.module.muc.MucService#getRoom(java.lang.String)
 	 */
 	public MucRoom getRoom(String name) {
+		name = name.toLowerCase();
+		
 		return rooms.get(name);
 	}
 }
