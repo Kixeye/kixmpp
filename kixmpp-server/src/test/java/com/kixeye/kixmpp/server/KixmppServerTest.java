@@ -118,7 +118,7 @@ public class KixmppServerTest {
 			((InMemoryAuthenticationService)server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
 			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
 			
-			XMPPConnection connection = new XMPPTCPConnection(new ConnectionConfiguration(server.getBindAddress().getHostName(), server.getBindAddress().getPort(), server.getDomain()));
+			XMPPConnection connection = new XMPPTCPConnection(new ConnectionConfiguration("localhost", server.getBindAddress().getPort(), server.getDomain()));
 				
 			try {
 				connection.connect();
