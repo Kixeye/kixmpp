@@ -29,11 +29,21 @@ public class KixmppStanzaRejectedException extends KixmppException {
 	private static final long serialVersionUID = -2495670401789500578L;
 
 	/**
-	 * Creates an auth response.
+	 * A rejection exception with a reason.
 	 * 
-	 * @param response
+	 * @param reason
 	 */
-	public KixmppStanzaRejectedException(String response) {
-		super(response);
+	public KixmppStanzaRejectedException(String reason) {
+		super(reason);
+	}
+	
+	/**
+	 * A rejection exception with a reason and a cause.
+	 * 
+	 * @param reason
+	 * @param cause
+	 */
+	public KixmppStanzaRejectedException(String reason, Throwable cause) {
+		super(reason, cause);
 	}
 }
