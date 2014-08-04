@@ -21,6 +21,8 @@ package com.kixeye.kixmpp.server.module;
  */
 
 
+import io.netty.channel.Channel;
+
 import java.util.List;
 
 import org.jdom2.Element;
@@ -37,7 +39,8 @@ public interface KixmppServerModule extends KixmppModule<KixmppServer> {
 	/**
 	 * Gets a list of features added by this module.
 	 * 
+	 * @param channel
 	 * @return
 	 */
-	public List<Element> getFeatures();
+	public List<Element> getFeatures(Channel channel);
 }

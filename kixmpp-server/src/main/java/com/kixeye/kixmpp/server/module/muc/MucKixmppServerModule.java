@@ -22,7 +22,6 @@ package com.kixeye.kixmpp.server.module.muc;
 
 import io.netty.channel.Channel;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -98,10 +97,10 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	}
 	
 	/**
-	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures()
+	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures(io.netty.channel.Channel)
 	 */
-	public List<Element> getFeatures() {
-		return Collections.emptyList();
+	public List<Element> getFeatures(Channel channel) {
+		return null;
 	}
 	
 	private KixmppStanzaHandler JOIN_ROOM_HANDLER = new KixmppStanzaHandler() {

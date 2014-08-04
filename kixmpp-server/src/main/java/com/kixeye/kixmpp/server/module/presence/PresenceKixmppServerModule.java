@@ -23,7 +23,6 @@ package com.kixeye.kixmpp.server.module.presence;
 import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
 
-import java.util.Collections;
 import java.util.List;
 
 import org.jdom2.Element;
@@ -61,10 +60,10 @@ public class PresenceKixmppServerModule implements KixmppServerModule {
 	}
 
 	/**
-	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures()
+	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures(io.netty.channel.Channel)
 	 */
-	public List<Element> getFeatures() {
-		return Collections.emptyList();
+	public List<Element> getFeatures(Channel channel) {
+		return null;
 	}
 	
 	private KixmppStanzaHandler PRESENCE_HANDLER = new KixmppStanzaHandler() {

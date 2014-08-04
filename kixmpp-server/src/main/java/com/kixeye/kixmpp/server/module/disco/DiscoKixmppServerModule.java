@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server.module.roster;
+package com.kixeye.kixmpp.server.module.disco;
 
 /*
  * #%L
@@ -36,7 +36,7 @@ import com.kixeye.kixmpp.server.module.KixmppServerModule;
  * 
  * @author ebahtijaragic
  */
-public class RosterKixmppServerModule implements KixmppServerModule {
+public class DiscoKixmppServerModule implements KixmppServerModule {
 	private KixmppServer server;
 	
 	/**
@@ -67,11 +67,18 @@ public class RosterKixmppServerModule implements KixmppServerModule {
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
 		 */
 		public void handle(Channel channel, Element stanza) {
-			Element query = stanza.getChild("query", Namespace.getNamespace("jabber:iq:roster"));
+			Element infoQuery = stanza.getChild("query", Namespace.getNamespace("http://jabber.org/protocol/disco#info"));
+			Element itemsQuery = stanza.getChild("query", Namespace.getNamespace("http://jabber.org/protocol/disco#items"));
 			
-			if (query != null) {
+			if (infoQuery != null) {
 				Element iq = new Element("iq");
 				iq.setAttribute("type", "result");
+				
+				String to = stanza.getAttributeValue("to");
+				
+				if (to != null) {
+					iq.setAttribute("from", to);
+				}
 				
 				String id = stanza.getAttributeValue("id");
 				
@@ -79,7 +86,34 @@ public class RosterKixmppServerModule implements KixmppServerModule {
 					iq.setAttribute("id", id);
 				}
 				
-				Element queryResult = new Element("query", Namespace.getNamespace("jabber:iq:roster"));
+				Element queryResult = new Element("query", Namespace.getNamespace("http://jabber.org/protocol/disco#info"));
+				
+				queryResult.addContent(new Element("feature", Namespace.getNamespace("http://jabber.org/protocol/disco#info")).setAttribute("var", "http://jabber.org/protocol/disco#info"));
+				queryResult.addContent(new Element("feature", Namespace.getNamespace("http://jabber.org/protocol/disco#info")).setAttribute("var", "http://jabber.org/protocol/disco#items"));
+				queryResult.addContent(new Element("feature", Namespace.getNamespace("http://jabber.org/protocol/disco#info")).setAttribute("var", "http://jabber.org/protocol/muc"));
+				queryResult.addContent(new Element("feature", Namespace.getNamespace("http://jabber.org/protocol/disco#info")).setAttribute("var", "jabber:iq:time"));
+				queryResult.addContent(new Element("feature", Namespace.getNamespace("http://jabber.org/protocol/disco#info")).setAttribute("var", "jabber:iq:version"));
+				
+				iq.addContent(queryResult);
+				
+				channel.writeAndFlush(iq);
+			} else if (itemsQuery != null) {
+				Element iq = new Element("iq");
+				iq.setAttribute("type", "result");
+				
+				String to = stanza.getAttributeValue("to");
+				
+				if (to != null) {
+					iq.setAttribute("from", to);
+				}
+				
+				String id = stanza.getAttributeValue("id");
+				
+				if (id != null) {
+					iq.setAttribute("id", id);
+				}
+				
+				Element queryResult = new Element("query", Namespace.getNamespace("http://jabber.org/protocol/disco#items"));
 				iq.addContent(queryResult);
 				
 				channel.writeAndFlush(iq);

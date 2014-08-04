@@ -61,14 +61,18 @@ public class BindKixmppServerModule implements KixmppServerModule {
 	}
 
 	/**
-	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures()
+	 * @see com.kixeye.kixmpp.server.module.KixmppServerModule#getFeatures(io.netty.channel.Channel)
 	 */
-	public List<Element> getFeatures() {
+	public List<Element> getFeatures(Channel channel) {
 		List<Element> features = new LinkedList<>();
 		
-		Element bind = new Element("bind", null, "urn:ietf:params:xml:ns:xmpp-bind");
+		KixmppJid jid = channel.attr(JID).get();
 		
-		features.add(bind);
+		if (jid == null) {
+			Element bind = new Element("bind", null, "urn:ietf:params:xml:ns:xmpp-bind");
+			
+			features.add(bind);
+		}
 		
 		return features;
 	}

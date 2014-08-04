@@ -32,6 +32,7 @@ import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.handler.KixmppStreamHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
+import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 
 /**
  * Displays features to the client.
@@ -58,9 +59,9 @@ public class FeaturesKixmppServerModule implements KixmppServerModule {
 	}
 
 	/**
-	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures()
+	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures(io.netty.channel.Channel)
 	 */
-	public List<Element> getFeatures() {
+	public List<Element> getFeatures(Channel channel) {
 		return null;
 	}
 	
@@ -69,12 +70,14 @@ public class FeaturesKixmppServerModule implements KixmppServerModule {
 		 * @see com.kixeye.kixmpp.server.KixmppStreamHandler#handleStreamStart(io.netty.channel.Channel, com.kixeye.kixmpp.KixmppStreamStart)
 		 */
 		public void handleStreamStart(Channel channel, KixmppStreamStart streamStart) {
-			KixmppCodec.sendXmppStreamRootStart(channel, server.getDomain(), null);
+			Boolean isAuthed = channel.attr(SaslKixmppServerModule.IS_AUTHENTICATED).get();
+			
+			KixmppCodec.sendXmppStreamRootStart(channel, server.getDomain(), null, isAuthed == null);
 			
 			Element features = new Element("features", "stream", "http://etherx.jabber.org/streams");
 			
 			for (KixmppServerModule module : server.modules()) {
-				List<Element> featuresList = module.getFeatures();
+				List<Element> featuresList = module.getFeatures(channel);
 				
 				if (featuresList != null) {
 					for (Element featureElement : featuresList) {

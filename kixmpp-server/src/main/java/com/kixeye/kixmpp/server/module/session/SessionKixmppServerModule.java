@@ -60,14 +60,18 @@ public class SessionKixmppServerModule implements KixmppServerModule {
 	}
 
 	/**
-	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures()
+	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures(io.netty.channel.Channel)
 	 */
-	public List<Element> getFeatures() {
+	public List<Element> getFeatures(Channel channel) {
 		List<Element> features = new LinkedList<>();
 		
-		Element bind = new Element("bind", null, "urn:ietf:params:xml:ns:xmpp-bind");
+		Boolean isSessionEnabled = channel.attr(IS_SESSION_ESTABLISHED).get();
 		
-		features.add(bind);
+		if (isSessionEnabled == null) {
+			Element bind = new Element("bind", null, "urn:ietf:params:xml:ns:xmpp-bind");
+			
+			features.add(bind);
+		}
 		
 		return features;
 	}
@@ -84,7 +88,6 @@ public class SessionKixmppServerModule implements KixmppServerModule {
 				
 				Element iq = new Element("iq");
 				iq.setAttribute("type", "result");
-				iq.setAttribute("from", server.getDomain());
 				
 				String id = stanza.getAttributeValue("id");
 				

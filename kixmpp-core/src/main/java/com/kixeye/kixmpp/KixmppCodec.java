@@ -216,11 +216,14 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 	 * @param channel
 	 * @param from
 	 * @param to
+	 * @param sendXmlHeader
 	 */
-	public static final ChannelFuture sendXmppStreamRootStart(Channel channel, String from, String to) {
+	public static final ChannelFuture sendXmppStreamRootStart(Channel channel, String from, String to, boolean sendXmlHeader) {
 		ByteBuf buffer = channel.alloc().buffer();
 		
-		buffer.writeBytes("<?xml version='1.0' encoding='UTF-8'?>".getBytes(StandardCharsets.UTF_8));
+		if (sendXmlHeader) {
+			buffer.writeBytes("<?xml version='1.0' encoding='UTF-8'?>".getBytes(StandardCharsets.UTF_8));
+		}
 		buffer.writeBytes("<stream:stream ".getBytes(StandardCharsets.UTF_8));
 		if (from != null) {
 			buffer.writeBytes(String.format("from=\"%s\" ", from).getBytes(StandardCharsets.UTF_8));
@@ -231,6 +234,17 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 		buffer.writeBytes("version=\"1.0\" xmlns=\"jabber:client\" xmlns:stream=\"http://etherx.jabber.org/streams\">".getBytes(StandardCharsets.UTF_8));
 		
 		return channel.writeAndFlush(buffer);
+	}
+	
+	/**
+	 * Sends the room XML element for starting a XMPP session.
+	 * 
+	 * @param channel
+	 * @param from
+	 * @param to
+	 */
+	public static final ChannelFuture sendXmppStreamRootStart(Channel channel, String from, String to) {
+		return sendXmppStreamRootStart(channel, from, to, true);
 	}
 	
 	/**

@@ -58,10 +58,12 @@ import reactor.core.spec.Reactors;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
+import com.kixeye.kixmpp.server.module.disco.DiscoKixmppServerModule;
 import com.kixeye.kixmpp.server.module.features.FeaturesKixmppServerModule;
 import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
 import com.kixeye.kixmpp.server.module.presence.PresenceKixmppServerModule;
@@ -179,6 +181,7 @@ public class KixmppServer implements AutoCloseable {
 		this.modulesToRegister.add(PresenceKixmppServerModule.class.getName());
 		this.modulesToRegister.add(MucKixmppServerModule.class.getName());
 		this.modulesToRegister.add(RosterKixmppServerModule.class.getName());
+		this.modulesToRegister.add(DiscoKixmppServerModule.class.getName());
 	}
 	
 	/**

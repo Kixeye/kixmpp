@@ -67,19 +67,23 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 	}
 
 	/**
-	 * @see com.kixeye.kixmpp.server.module.KixmppModule#getFeatures()
+	 * @see com.kixeye.kixmpp.server.module.KixmppServerModule#getFeatures(io.netty.channel.Channel)
 	 */
-	public List<Element> getFeatures() {
+	public List<Element> getFeatures(Channel channel) {
 		List<Element> features = new LinkedList<>();
 		
-		Element mechanisms = new Element("mechanisms", null, "urn:ietf:params:xml:ns:xmpp-sasl");
+		Boolean isAuthed = channel.attr(IS_AUTHENTICATED).get();
 		
-		Element plainMechanism = new Element("mechanism", "urn:ietf:params:xml:ns:xmpp-sasl");
-		plainMechanism.setText("PLAIN");
-		
-		mechanisms.addContent(plainMechanism);
-		
-		features.add(mechanisms);
+		if (isAuthed == null) {
+			Element mechanisms = new Element("mechanisms", null, "urn:ietf:params:xml:ns:xmpp-sasl");
+			
+			Element plainMechanism = new Element("mechanism", "urn:ietf:params:xml:ns:xmpp-sasl");
+			plainMechanism.setText("PLAIN");
+			
+			mechanisms.addContent(plainMechanism);
+			
+			features.add(mechanisms);
+		}
 		
 		return features;
 	}
