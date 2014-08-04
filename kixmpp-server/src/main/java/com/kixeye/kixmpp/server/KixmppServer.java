@@ -1,26 +1,5 @@
 package com.kixeye.kixmpp.server;
 
-/*
- * #%L
- * KIXMPP
- * %%
- * Copyright (C) 2014 KIXEYE, Inc
- * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- * #L%
- */
-
-
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
@@ -32,6 +11,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -69,6 +50,25 @@ import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
 import com.kixeye.kixmpp.server.module.presence.PresenceKixmppServerModule;
 import com.kixeye.kixmpp.server.module.roster.RosterKixmppServerModule;
 import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
+/*
+ * #%L
+ * KIXMPP
+ * %%
+ * Copyright (C) 2014 KIXEYE, Inc
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
 
 /**
  * A XMPP server.
@@ -162,6 +162,7 @@ public class KixmppServer implements AutoCloseable {
 			.channel(NioServerSocketChannel.class)
 			.childHandler(new ChannelInitializer<SocketChannel>() {
 				protected void initChannel(SocketChannel ch) throws Exception {
+                    ch.pipeline().addLast(new LoggingHandler(LogLevel.INFO));
 					ch.pipeline().addLast(new KixmppCodec());
 					ch.pipeline().addLast(new KixmppServerMessageHandler());
 				}
@@ -172,6 +173,7 @@ public class KixmppServer implements AutoCloseable {
 		this.eventEngine = new KixmppEventEngine(reactor);
 		this.environment = environment;
 		this.reactor = reactor;
+
 		this.sslContext = sslContext;
 		
 		this.modulesToRegister.add(FeaturesKixmppServerModule.class.getName());
