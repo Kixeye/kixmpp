@@ -60,7 +60,6 @@ import reactor.core.Environment;
 import reactor.core.Reactor;
 import reactor.core.composable.Deferred;
 import reactor.core.composable.Promise;
-import reactor.core.composable.spec.Promises;
 import reactor.core.spec.Reactors;
 import reactor.event.registry.Registration;
 
@@ -85,9 +84,6 @@ public class KixmppClient implements AutoCloseable {
 	private final Bootstrap bootstrap;
 	
 	private final KixmppEventEngine eventEngine;
-	
-	private final Environment environment;
-	private final Reactor reactor;
 	
 	private final ConcurrentLinkedQueue<Registration<?>> consumerRegistrations = new ConcurrentLinkedQueue<>();
 
@@ -162,10 +158,8 @@ public class KixmppClient implements AutoCloseable {
 			.option(ChannelOption.SO_KEEPALIVE, true)
 			.handler(new KixmppClientChannelInitializer());
 		
-		this.environment = environment;
-		this.reactor = reactor;
 		this.sslContext = sslContext;
-		this.eventEngine = new KixmppEventEngine(clientId, reactor);
+		this.eventEngine = new KixmppEventEngine(clientId, environment, reactor);
 		
 		// set modules to be registered
 		this.modulesToRegister.add(MucKixmppClientModule.class.getName());
@@ -185,7 +179,7 @@ public class KixmppClient implements AutoCloseable {
 		
 		setUp();
 		
-		final Deferred<KixmppClient, Promise<KixmppClient>> deferred = Promises.defer(environment, reactor.getDispatcher());
+		final Deferred<KixmppClient, Promise<KixmppClient>> deferred = eventEngine.defer();
 		
 		bootstrap.connect(hostname, port).addListener(new GenericFutureListener<Future<? super Void>>() {
 			public void operationComplete(Future<? super Void> future) throws Exception {
@@ -219,7 +213,7 @@ public class KixmppClient implements AutoCloseable {
 		this.password = password;
 		this.resource = resource;
 
-		deferredLogin = Promises.defer(environment, reactor.getDispatcher());
+		deferredLogin = eventEngine.defer();
 		
 		KixmppCodec.sendXmppStreamRootStart(channel.get(), null, domain);
 		
@@ -231,7 +225,7 @@ public class KixmppClient implements AutoCloseable {
 	 */ 
 	public Promise<KixmppClient> disconnect() {
 		if (state.get() == State.DISCONNECTED) {
-			final Deferred<KixmppClient, Promise<KixmppClient>> deferred = Promises.defer(environment, Environment.WORK_QUEUE);
+			final Deferred<KixmppClient, Promise<KixmppClient>> deferred = eventEngine.defer();
 			deferred.accept(this);
 			
 			return deferred.compose();
@@ -241,7 +235,7 @@ public class KixmppClient implements AutoCloseable {
 		
 		checkAndSetState(State.DISCONNECTING, State.CONNECTED, State.LOGGED_IN, State.LOGGING_IN);
 
-		deferredDisconnect = Promises.defer(environment, reactor.getDispatcher());
+		deferredDisconnect = eventEngine.defer();
 		
 		cleanUp();
 		

@@ -32,12 +32,12 @@ import reactor.core.Environment;
 import reactor.core.Reactor;
 import reactor.core.composable.Deferred;
 import reactor.core.composable.Promise;
-import reactor.core.composable.spec.Promises;
 import reactor.core.spec.Reactors;
 
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
@@ -83,9 +83,6 @@ public class KixmppServer implements AutoCloseable {
 	
 	private final ServerBootstrap bootstrap;
 	
-	private final Environment environment;
-	private final Reactor reactor;
-
 	private final KixmppEventEngine eventEngine;
 	
 	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
@@ -159,9 +156,7 @@ public class KixmppServer implements AutoCloseable {
 
 		this.bindAddress = bindAddress;
 		this.domain = domain.toLowerCase();
-		this.eventEngine = new KixmppEventEngine(reactor);
-		this.environment = environment;
-		this.reactor = reactor;
+		this.eventEngine = new KixmppEventEngine(environment, reactor);
 
 		this.modulesToRegister.add(FeaturesKixmppServerModule.class.getName());
 		this.modulesToRegister.add(SaslKixmppServerModule.class.getName());
@@ -189,7 +184,7 @@ public class KixmppServer implements AutoCloseable {
 			installModule(moduleClassName);
 		}
 		
-		final Deferred<KixmppServer, Promise<KixmppServer>> deferred = Promises.defer(environment, reactor.getDispatcher());
+		final Deferred<KixmppServer, Promise<KixmppServer>> deferred = eventEngine.defer();
 
 		channelFuture.set(bootstrap.bind(bindAddress));
 		
@@ -229,7 +224,7 @@ public class KixmppServer implements AutoCloseable {
 			entry.getValue().uninstall(this);
 		}
 		
-		final Deferred<KixmppServer, Promise<KixmppServer>> deferred = Promises.defer(environment, reactor.getDispatcher());
+		final Deferred<KixmppServer, Promise<KixmppServer>> deferred = eventEngine.defer();
 
 		ChannelFuture serverChannelFuture = channelFuture.get();
 		

@@ -31,7 +31,11 @@ import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import reactor.core.Environment;
 import reactor.core.Reactor;
+import reactor.core.composable.Deferred;
+import reactor.core.composable.Promise;
+import reactor.core.composable.spec.Promises;
 import reactor.event.Event;
 import reactor.event.registry.Registration;
 import reactor.event.selector.Selectors;
@@ -53,24 +57,37 @@ public class KixmppEventEngine {
 	
 	private final ConcurrentHashMap<Tuple, ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>>> consumers = new ConcurrentHashMap<>();
 
+	private final Environment environment;
 	private final Reactor reactor;
 	
 	/**
+	 * @param environment
 	 * @param reactor
 	 */
-	public KixmppEventEngine(Reactor reactor) {
-		this(null, reactor);
+	public KixmppEventEngine(Environment environment, Reactor reactor) {
+		this(null, environment, reactor);
 	}
 
 	/**
+	 * @param environment
 	 * @param prefix
 	 * @param reactor
 	 */
-	public KixmppEventEngine(String prefix, Reactor reactor) {
+	public KixmppEventEngine(String prefix, Environment environment, Reactor reactor) {
 		assert reactor != null : "Argument 'reactor' cannot be null";
 		
 		this.prefix = prefix;
+		this.environment = environment;
 		this.reactor = reactor;
+	}
+	
+	/**
+	 * Creates a {@link Deferred} object for future execution.
+	 * 
+	 * @return
+	 */
+	public <T> Deferred<T, Promise<T>> defer() {
+		return Promises.defer(environment, reactor.getDispatcher());
 	}
 	
 	/**
