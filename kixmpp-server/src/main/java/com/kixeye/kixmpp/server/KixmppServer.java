@@ -13,7 +13,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
@@ -90,8 +89,6 @@ public class KixmppServer implements AutoCloseable {
 
 	private final KixmppEventEngine eventEngine;
 	
-	private final SslContext sslContext;
-
 	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 	private final ConcurrentHashMap<String, KixmppServerModule> modules = new ConcurrentHashMap<>();
 	
@@ -110,10 +107,9 @@ public class KixmppServer implements AutoCloseable {
 	 * Creates a new {@link KixmppServer} with the given ssl engine.
 	 * 
 	 * @param domain
-	 * @param sslContext
 	 */
-	public KixmppServer(String domain, SslContext sslContext) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, DEFAULT_SOCKET_ADDRESS, domain, sslContext);
+	public KixmppServer(String domain) {
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, DEFAULT_SOCKET_ADDRESS, domain);
 	}
 	
 	/**
@@ -121,10 +117,9 @@ public class KixmppServer implements AutoCloseable {
 	 * 
 	 * @param bindAddress
 	 * @param domain
-	 * @param sslContext
 	 */
-	public KixmppServer(InetSocketAddress bindAddress, String domain, SslContext sslContext) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, bindAddress, domain, sslContext);
+	public KixmppServer(InetSocketAddress bindAddress, String domain) {
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, bindAddress, domain);
 	}
 	
 	/**
@@ -136,10 +131,9 @@ public class KixmppServer implements AutoCloseable {
 	 * @param dispatcher
 	 * @param bindAddress
 	 * @param domain
-	 * @param sslContext
 	 */
-	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, String dispatcher, InetSocketAddress bindAddress, String domain, SslContext sslContext) {
-		this(workerGroup, bossGroup, environment, Reactors.reactor(environment, dispatcher), bindAddress, domain, sslContext);
+	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, String dispatcher, InetSocketAddress bindAddress, String domain) {
+		this(workerGroup, bossGroup, environment, Reactors.reactor(environment, dispatcher), bindAddress, domain);
 	}
 	
 	/**
@@ -152,11 +146,7 @@ public class KixmppServer implements AutoCloseable {
 	 * @param domain
 	 * @param sslContext
 	 */
-	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, Reactor reactor, InetSocketAddress bindAddress, String domain, SslContext sslContext) {
-		if (sslContext != null) {
-			assert sslContext.isServer() : "The given SslContext must be a server context.";
-		}
-		
+	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, Reactor reactor, InetSocketAddress bindAddress, String domain) {
 		bootstrap = new ServerBootstrap()
 			.group(bossGroup, workerGroup)
 			.channel(NioServerSocketChannel.class)
@@ -174,8 +164,6 @@ public class KixmppServer implements AutoCloseable {
 		this.environment = environment;
 		this.reactor = reactor;
 
-		this.sslContext = sslContext;
-		
 		this.modulesToRegister.add(FeaturesKixmppServerModule.class.getName());
 		this.modulesToRegister.add(SaslKixmppServerModule.class.getName());
 		this.modulesToRegister.add(BindKixmppServerModule.class.getName());
