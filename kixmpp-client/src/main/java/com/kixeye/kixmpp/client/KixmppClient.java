@@ -63,12 +63,16 @@ import reactor.core.composable.Promise;
 import reactor.core.spec.Reactors;
 import reactor.event.registry.Registration;
 
+import com.kixeye.kixmpp.KixmppAuthException;
 import com.kixeye.kixmpp.KixmppCodec;
+import com.kixeye.kixmpp.KixmppException;
+import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.client.module.KixmppClientModule;
 import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
+import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 
 /**
  * A XMPP client.
@@ -89,8 +93,7 @@ public class KixmppClient implements AutoCloseable {
 
 	private final SslContext sslContext;
 	
-	private final Set<KixmppStanzaInterceptor> incomingStanzaInterceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
-	private final Set<KixmppStanzaInterceptor> outgoingStanzaInterceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
+	private final Set<KixmppStanzaInterceptor> interceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
 
 	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 	private final ConcurrentHashMap<String, KixmppClientModule> modules = new ConcurrentHashMap<>();
@@ -295,39 +298,21 @@ public class KixmppClient implements AutoCloseable {
     }
     
     /**
-     * Adds an incoming stanza interceptor.
+     * Adds a stanza interceptor.
      * 
      * @param interceptor
      */
-    public boolean addIncomingStanzaInterceptor(KixmppStanzaInterceptor interceptor) {
-    	return incomingStanzaInterceptors.add(interceptor);
+    public boolean addInterceptor(KixmppStanzaInterceptor interceptor) {
+    	return interceptors.add(interceptor);
     }
     
     /**
-     * Removes an incoming stanza interceptor.
+     * Removes a stanza interceptor.
      * 
      * @param interceptor
      */
-    public boolean removeIncomingStanzaInterceptor(KixmppStanzaInterceptor interceptor) {
-    	return incomingStanzaInterceptors.remove(interceptor);
-    }
-    
-    /**
-     * Adds an outgoing stanza interceptor.
-     * 
-     * @param interceptor
-     */
-    public boolean addOutgoingStanzaInterceptor(KixmppStanzaInterceptor interceptor) {
-    	return outgoingStanzaInterceptors.add(interceptor);
-    }
-    
-    /**
-     * Removes an outgoing stanza interceptor.
-     * 
-     * @param interceptor
-     */
-    public boolean removeOutgoingStanzaInterceptor(KixmppStanzaInterceptor interceptor) {
-    	return outgoingStanzaInterceptors.remove(interceptor);
+    public boolean removeInterceptor(KixmppStanzaInterceptor interceptor) {
+    	return interceptors.remove(interceptor);
     }
     
     /**
@@ -658,31 +643,47 @@ public class KixmppClient implements AutoCloseable {
 			if (msg instanceof Element) {
 				Element stanza = (Element)msg;
 				
-				for (KixmppStanzaInterceptor interceptor : incomingStanzaInterceptors) {
+				boolean rejected = false;
+				
+				for (KixmppStanzaInterceptor interceptor : interceptors) {
 					try {
-						interceptor.interceptStanza((Element)msg);
+						interceptor.interceptIncoming(ctx.channel(),(Element)msg);
+					} catch (KixmppStanzaRejectedException e) {
+						rejected = true;
+						
+						logger.debug("Incoming stanza interceptor [{}] threw an rejected exception.", interceptor, e);
 					} catch (Exception e) {
-						logger.error("Incomming stanza interceptor [{}] threw an exception.", interceptor, e);
+						logger.error("Incoming stanza interceptor [{}] threw an exception.", interceptor, e);
 					}
 				}
 	
-				eventEngine.publish(ctx.channel(), stanza);
+				if (!rejected) {
+					eventEngine.publish(ctx.channel(), stanza);
+				}
 			}
 		}
 		
 		@Override
 		public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+			boolean rejected = false;
+			
 			if (msg instanceof Element) {
-				for (KixmppStanzaInterceptor interceptor : outgoingStanzaInterceptors) {
+				for (KixmppStanzaInterceptor interceptor : interceptors) {
 					try {
-						interceptor.interceptStanza((Element)msg);
+						interceptor.interceptOutgoing(ctx.channel(), (Element)msg);
+					} catch (KixmppStanzaRejectedException e) {
+						rejected = true;
+						
+						logger.debug("Outgoing stanza interceptor [{}] threw an rejected exception.", interceptor, e);
 					} catch (Exception e) {
 						logger.error("Outgoing stanza interceptor [{}] threw an exception.", interceptor, e);
 					}
 				}
 			}
 			
-			super.write(ctx, msg, promise);
+			if (!rejected) {
+				super.write(ctx, msg, promise);
+			}
 		}
 		
 		@Override

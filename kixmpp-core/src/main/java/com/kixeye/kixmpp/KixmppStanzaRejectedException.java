@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.client;
+package com.kixeye.kixmpp;
 
 /*
  * #%L
@@ -20,14 +20,12 @@ package com.kixeye.kixmpp.client;
  * #L%
  */
 
-
-
 /**
- * An authentication exception that gets thrown when auth fails.
+ * An exception that gets thrown when a stanza is rejected.
  * 
  * @author ebahtijaragic
  */
-public class KixmppAuthException extends KixmppException {
+public class KixmppStanzaRejectedException extends KixmppException {
 	private static final long serialVersionUID = -2495670401789500578L;
 
 	/**
@@ -35,7 +33,7 @@ public class KixmppAuthException extends KixmppException {
 	 * 
 	 * @param response
 	 */
-	public KixmppAuthException(String response) {
+	public KixmppStanzaRejectedException(String response) {
 		super(response);
 	}
 }

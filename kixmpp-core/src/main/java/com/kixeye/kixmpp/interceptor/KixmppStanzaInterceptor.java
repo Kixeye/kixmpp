@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.client;
+package com.kixeye.kixmpp.interceptor;
 
 /*
  * #%L
@@ -20,7 +20,11 @@ package com.kixeye.kixmpp.client;
  * #L%
  */
 
+import io.netty.channel.Channel;
+
 import org.jdom2.Element;
+
+import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 
 /**
  * Intercepts stanzas.
@@ -29,9 +33,18 @@ import org.jdom2.Element;
  */
 public interface KixmppStanzaInterceptor {
 	/**
-	 * Intercepts a stanza.
+	 * Intercepts an incoming stanza.
 	 * 
+	 * @param channel
 	 * @param stanza
 	 */
-	public void interceptStanza(Element stanza);
+	public void interceptIncoming(Channel channel, Element stanza) throws KixmppStanzaRejectedException;
+
+	/**
+	 * Intercepts an outgoing stanza.
+	 * 
+	 * @param channel
+	 * @param stanza
+	 */
+	public void interceptOutgoing(Channel channel, Element stanza) throws KixmppStanzaRejectedException;
 }

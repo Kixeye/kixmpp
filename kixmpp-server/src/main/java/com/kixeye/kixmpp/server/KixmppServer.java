@@ -7,6 +7,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -35,9 +36,11 @@ import reactor.core.composable.Promise;
 import reactor.core.spec.Reactors;
 
 import com.kixeye.kixmpp.KixmppCodec;
+import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
+import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
@@ -86,7 +89,9 @@ public class KixmppServer implements AutoCloseable {
 	
 	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 	private final ConcurrentHashMap<String, KixmppServerModule> modules = new ConcurrentHashMap<>();
-	
+
+	private final Set<KixmppStanzaInterceptor> interceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
+
 	private final AtomicReference<ChannelFuture> channelFuture = new AtomicReference<>();
 	private final AtomicReference<Channel> channel = new AtomicReference<>();
 	private AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
@@ -344,6 +349,24 @@ public class KixmppServer implements AutoCloseable {
 		return domain;
 	}
 
+    /**
+     * Adds a stanza interceptor.
+     * 
+     * @param interceptor
+     */
+    public boolean addInterceptor(KixmppStanzaInterceptor interceptor) {
+    	return interceptors.add(interceptor);
+    }
+    
+    /**
+     * Removes a stanza interceptor.
+     * 
+     * @param interceptor
+     */
+    public boolean removeInterceptor(KixmppStanzaInterceptor interceptor) {
+    	return interceptors.remove(interceptor);
+    }
+    
 	/**
      * Tries to install module.
      * 
@@ -404,7 +427,23 @@ public class KixmppServer implements AutoCloseable {
 			if (msg instanceof Element) {
 				Element stanza = (Element)msg;
 				
-				eventEngine.publish(ctx.channel(), stanza);
+				boolean rejected = false;
+				
+				for (KixmppStanzaInterceptor interceptor : interceptors) {
+					try {
+						interceptor.interceptIncoming(ctx.channel(),(Element)msg);
+					} catch (KixmppStanzaRejectedException e) {
+						rejected = true;
+						
+						logger.debug("Incoming stanza interceptor [{}] threw an rejected exception.", interceptor, e);
+					} catch (Exception e) {
+						logger.error("Incoming stanza interceptor [{}] threw an exception.", interceptor, e);
+					}
+				}
+				
+				if (!rejected) {
+					eventEngine.publish(ctx.channel(), stanza);
+				}
 			} else if (msg instanceof KixmppStreamStart) {
 				KixmppStreamStart streamStart = (KixmppStreamStart)msg;
 
@@ -415,6 +454,29 @@ public class KixmppServer implements AutoCloseable {
 				eventEngine.publish(ctx.channel(), streamEnd);
 			} else {
 				logger.error("Unknown message type [{}] from Channel [{}]", msg, ctx.channel());
+			}
+		}
+		
+		@Override
+		public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+			boolean rejected = false;
+			
+			if (msg instanceof Element) {
+				for (KixmppStanzaInterceptor interceptor : interceptors) {
+					try {
+						interceptor.interceptOutgoing(ctx.channel(), (Element)msg);
+					} catch (KixmppStanzaRejectedException e) {
+						rejected = true;
+						
+						logger.debug("Outgoing stanza interceptor [{}] threw an rejected exception.", interceptor, e);
+					} catch (Exception e) {
+						logger.error("Outgoing stanza interceptor [{}] threw an exception.", interceptor, e);
+					}
+				}
+			}
+			
+			if (!rejected) {
+				super.write(ctx, msg, promise);
 			}
 		}
 		

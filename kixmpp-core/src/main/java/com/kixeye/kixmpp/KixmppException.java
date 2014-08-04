@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.client;
+package com.kixeye.kixmpp;
 
 /*
  * #%L
@@ -19,7 +19,6 @@ package com.kixeye.kixmpp.client;
  * limitations under the License.
  * #L%
  */
-
 
 /**
  * A generic exception thrown by {@link KixmppClient}.
