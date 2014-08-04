@@ -114,7 +114,7 @@ public class KixmppServer implements AutoCloseable {
 	 * @param domain
 	 */
 	public KixmppServer(InetSocketAddress bindAddress, String domain) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, bindAddress, domain);
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.THREAD_POOL, bindAddress, domain);
 	}
 	
 	/**
