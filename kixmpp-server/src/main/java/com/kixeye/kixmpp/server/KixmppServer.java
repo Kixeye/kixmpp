@@ -37,7 +37,6 @@ import reactor.core.spec.Reactors;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
-import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
