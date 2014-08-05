@@ -65,12 +65,10 @@ public class SessionKixmppServerModule implements KixmppServerModule {
 	public List<Element> getFeatures(Channel channel) {
 		List<Element> features = new LinkedList<>();
 
-        features.add(new Element("session", Namespace.getNamespace("session","urn:ietf:params:xml:ns:xmpp-session")));
-
 		Boolean isSessionEnabled = channel.attr(IS_SESSION_ESTABLISHED).get();
 		
 		if (isSessionEnabled == null) {
-			Element bind = new Element("bind", null, "urn:ietf:params:xml:ns:xmpp-bind");
+			Element bind = new Element("session", null, "urn:ietf:params:xml:ns:xmpp-session");
 			
 			features.add(bind);
 		}
