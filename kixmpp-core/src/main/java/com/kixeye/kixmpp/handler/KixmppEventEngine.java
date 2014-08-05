@@ -100,6 +100,42 @@ public class KixmppEventEngine {
 	}
 	
 	/**
+	 * Published an arbitrary task for serial execution.
+	 * 
+	 * @param address
+	 * @param task
+	 */
+	public void publishTask(String address, Task task) {
+		DispatchQueue queue;
+		
+		try {
+			queue = queues.get("address:" + address);
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+		
+		queue.execute(task);
+	}
+	
+	/**
+	 * Published an arbitrary task for serial execution.
+	 * 
+	 * @param channel
+	 * @param task
+	 */
+	public void publishTask(Channel channel, Task task) {
+		DispatchQueue queue;
+		
+		try {
+			queue = queues.get("channel:" + channel.hashCode());
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+
+		queue.execute(task);
+	}
+	
+	/**
 	 * Publishes that a channel has connected.
 	 * 
 	 * @param channel
