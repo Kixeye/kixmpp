@@ -20,6 +20,8 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
+import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import io.netty.channel.Channel;
@@ -27,6 +29,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
+import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,8 +40,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class MucRoom {
     private final KixmppJid roomJid;
-    private ConcurrentHashMap<String, Channel> users = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Channel, String> channelToNickname = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, Participant> participantsByNickname = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Channel, String> nicknamesByChannel = new ConcurrentHashMap<>();
 
     /**
      * @param roomJid
@@ -64,13 +67,15 @@ public class MucRoom {
      */
     public void join(Channel channel, String nickname) {
         synchronized (channel) {
-            if (users.putIfAbsent(nickname, channel) == null) {
-                channelToNickname.put(channel, nickname);
+            KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
+            Participant participant = new Participant(jid, nickname, channel);
+            if (participantsByNickname.putIfAbsent(nickname, participant) == null) {
+                nicknamesByChannel.put(channel, nickname);
 
                 Element presence = new Element("presence");
                 presence.setAttribute("id", UUID.randomUUID().toString());
                 presence.setAttribute("from", roomJid.withResource(nickname).toString());
-                presence.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
+                presence.setAttribute("to", jid.toString());
 
                 Element x = new Element("x", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
 
@@ -104,23 +109,23 @@ public class MucRoom {
      */
     public void leave(Channel channel) {
         synchronized (channel) {
-            String nickname = channelToNickname.remove(channel);
+            String nickname = nicknamesByChannel.remove(channel);
 
             if (nickname != null) {
-                users.remove(nickname);
+                participantsByNickname.remove(nickname);
             }
         }
     }
 
     public void broadcast(String... messages) {
-        for (Channel channel : users.values()) {
+        for (Participant participant : participantsByNickname.values()) {
             for (String message : messages) {
                 Element stanza = createMessage(UUID.randomUUID().toString(),
                         roomJid,
-                        channel.attr(BindKixmppServerModule.JID).get(),
+                        participant.getJid(),
                         "groupchat",
                         message);
-                channel.writeAndFlush(stanza);
+                participant.getChannel().writeAndFlush(stanza);
             }
         }
     }
@@ -149,14 +154,14 @@ public class MucRoom {
      * @param stanza
      */
     public void broadcast(Channel channel, Element stanza) {
-        if (channelToNickname.containsKey(channel)) {
+        if (nicknamesByChannel.containsKey(channel)) {
             Element body = new Element("body");
             body.setText(stanza.getChildText("body", Namespace.getNamespace("jabber:client")));
 
-            for (Channel userChannel : channelToNickname.keySet()) {
+            for (Channel userChannel : nicknamesByChannel.keySet()) {
                 Element message = new Element("message");
                 message.setAttribute("id", UUID.randomUUID().toString());
-                message.setAttribute("from", roomJid.withResource(channelToNickname.get(channel)).toString());
+                message.setAttribute("from", roomJid.withResource(nicknamesByChannel.get(channel)).toString());
                 message.setAttribute("to", userChannel.attr(BindKixmppServerModule.JID).get().toString());
                 message.setAttribute("type", "groupchat");
                 message.addContent(body.clone());
@@ -187,6 +192,10 @@ public class MucRoom {
         userChannelToInvite.writeAndFlush(message);
     }
 
+    public Collection<Participant> getParticipants(){
+        return Lists.newArrayList(participantsByNickname.values());
+    }
+
     private class CloseChannelListener implements GenericFutureListener<Future<? super Void>> {
         private final Channel channel;
 
@@ -199,6 +208,31 @@ public class MucRoom {
 
         public void operationComplete(Future<? super Void> future) throws Exception {
             leave(channel);
+        }
+    }
+
+    public static class Participant{
+        private KixmppJid jid;
+        private String nickname;
+        private Channel channel;
+        //private Role role...someday
+
+        public Participant(KixmppJid jid, String nickname, Channel channel){
+            this.jid = jid;
+            this.nickname = nickname;
+            this.channel = channel;
+        }
+
+        public String getNickname(){
+            return nickname;
+        }
+
+        public KixmppJid getJid() {
+            return jid;
+        }
+
+        public Channel getChannel() {
+            return channel;
         }
     }
 }
