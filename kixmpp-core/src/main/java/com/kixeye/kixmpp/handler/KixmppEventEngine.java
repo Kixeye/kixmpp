@@ -105,11 +105,11 @@ public class KixmppEventEngine {
 	 * @param address
 	 * @param task
 	 */
-	public void publishTask(String address, Task task) {
+	public void publishTask(KixmppJid jid, Task task) {
 		DispatchQueue queue;
 		
 		try {
-			queue = queues.get("address:" + address);
+			queue = queues.get("address:" + jid.getFullJid());
 		} catch (ExecutionException e) {
 			throw new RuntimeException(e);
 		}
