@@ -112,25 +112,31 @@ public class MucRoom {
         }
     }
 
-    public void broadcast(String... message) {
+    public void broadcast(String... messages) {
         for (Channel channel : users.values()) {
-            Element stanza = createMessage(UUID.randomUUID().toString(),
-                    roomJid,
-                    channel.attr(BindKixmppServerModule.JID).get(),
-                    "groupchat");
-            channel.writeAndFlush(stanza);
+            for (String message : messages) {
+                Element stanza = createMessage(UUID.randomUUID().toString(),
+                        roomJid,
+                        channel.attr(BindKixmppServerModule.JID).get(),
+                        "groupchat",
+                        message);
+                channel.writeAndFlush(stanza);
+            }
         }
     }
 
-    private Element createMessage(String id, KixmppJid from, KixmppJid to, String type) {
-        Element message = new Element("message");
+    private Element createMessage(String id, KixmppJid from, KixmppJid to, String type, String bodyText) {
+        Element message = new Element("message", Namespace.getNamespace("http://jabber.org/protocol/muc"));
 
-        ///TODO
-//        message.setAttribute("id", id);
-//        message.setAttribute("from", from.toString());
-//        message.setAttribute("to", to.toString());
-//        message.setAttribute("type", type);
-//        message.addContent(body.clone());
+        message.setAttribute("to", to.getFullJid());
+        message.setAttribute("from", from.getFullJid());
+        message.setAttribute("type", type);
+        message.setAttribute("id", id);
+
+        Element body = new Element("body",Namespace.getNamespace("http://jabber.org/protocol/muc"));
+        body.addContent(bodyText);
+
+        message.addContent(body);
 
         return message;
     }
