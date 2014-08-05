@@ -31,6 +31,13 @@ public class KixmppJid {
 	private final String resource;
 	
 	/**
+	 * @param domain
+	 */
+	public KixmppJid(String domain) {
+		this(null, domain, null);
+	}
+	
+	/**
 	 * @param node
 	 * @param domain
 	 */
@@ -44,7 +51,6 @@ public class KixmppJid {
 	 * @param resource
 	 */
 	public KixmppJid(String node, String domain, String resource) {
-		assert node != null && !node.isEmpty() : "Argument 'node' cannot be null or empty";
 		assert domain != null && !domain.isEmpty() : "Argument 'domain' cannot be null or empty";
 
 		this.node = node;
@@ -62,7 +68,11 @@ public class KixmppJid {
 		String[] jidSplit = jid.split("/", 2);
 		String[] domainSplit = jidSplit[0].split("@", 2);
 		
-		return new KixmppJid(domainSplit[0], domainSplit[1], jidSplit.length == 2 ? jidSplit[1] : null);
+		if (domainSplit.length == 1) {
+			return new KixmppJid(null, domainSplit[0], jidSplit.length == 2 ? jidSplit[1] : null);
+		} else {
+			return new KixmppJid(domainSplit[0], domainSplit[1], jidSplit.length == 2 ? jidSplit[1] : null);
+		}
 	}
 
 	/**

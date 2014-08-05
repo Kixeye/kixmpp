@@ -56,14 +56,14 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getEventEngine().register("auth", null, AUTH_HANDLER);
+		this.server.getEventEngine().registerGlobalStanzaHandler("auth", AUTH_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getEventEngine().unregister("auth", null, AUTH_HANDLER);
+		this.server.getEventEngine().unregisterGlobalStanzaHandler("auth", AUTH_HANDLER);
 	}
 
 	/**

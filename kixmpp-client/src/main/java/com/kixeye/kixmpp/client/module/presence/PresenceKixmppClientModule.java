@@ -67,14 +67,14 @@ public class PresenceKixmppClientModule implements KixmppClientModule {
 	public void install(KixmppClient client) {
 		this.client = client;
 
-		client.getEventEngine().register("presence", "jabber:client", presenceHandler);
+		client.getEventEngine().registerGlobalStanzaHandler("presence", presenceHandler);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.client.module.KixmppClientModule#uninstall(com.kixeye.kixmpp.client.KixmppClient)
 	 */
 	public void uninstall(KixmppClient client) {
-		client.getEventEngine().unregister("presence", "jabber:client", presenceHandler);
+		client.getEventEngine().unregisterGlobalStanzaHandler("presence", presenceHandler);
 	}
 
 	/**

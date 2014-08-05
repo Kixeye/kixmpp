@@ -41,13 +41,13 @@
 	</properties>
 
 	<dependencies>
-		<!-- Reactor -->
+		<!-- HawtDispatch -->
 		<dependency>
-			<groupId>org.projectreactor</groupId>
-			<artifactId>reactor-core</artifactId>
-			<version>${reactor.version}</version>
+			<groupId>org.fusesource.hawtdispatch</groupId>
+			<artifactId>hawtdispatch</artifactId>
+			<version>${hawtdispatch.version}</version>
 		</dependency>
-		
+
 		<!-- Netty -->
 		<dependency>
 			<groupId>io.netty</groupId>
@@ -70,6 +70,13 @@
 			<version>${netty.version}</version>
 		</dependency>
 
+		<!-- Guava -->
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>17.0</version>
+		</dependency>
+		
 		<!-- XML Parsing -->
 		<dependency>
 			<groupId>com.fasterxml</groupId>

@@ -22,28 +22,24 @@ package com.kixeye.kixmpp.handler;
 
 import io.netty.channel.Channel;
 
-import java.util.Iterator;
-import java.util.Map.Entry;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
+import org.fusesource.hawtdispatch.Dispatch;
+import org.fusesource.hawtdispatch.DispatchQueue;
+import org.fusesource.hawtdispatch.Task;
 import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import reactor.core.Environment;
-import reactor.core.Reactor;
-import reactor.core.composable.Deferred;
-import reactor.core.composable.Promise;
-import reactor.core.composable.spec.Promises;
-import reactor.event.Event;
-import reactor.event.registry.Registration;
-import reactor.event.selector.Selectors;
-import reactor.function.Consumer;
-import reactor.tuple.Tuple;
-
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.tuple.Tuple;
 
 /**
  * A stanza handler that uses {@link Reactor}.
@@ -51,44 +47,17 @@ import com.kixeye.kixmpp.KixmppStreamStart;
  * @author ebahtijaragic
  */
 public class KixmppEventEngine {
-	private static final Logger logger = LoggerFactory.getLogger(KixmppEventEngine.class);
-	
-	private final String prefix;
-	
-	private final ConcurrentHashMap<Tuple, ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>>> consumers = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<Tuple, Set<KixmppStanzaHandler>> stanzaHandlers = new ConcurrentHashMap<>();
+	private final Set<KixmppConnectionHandler> connectionHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppConnectionHandler, Boolean>());
+	private final Set<KixmppStreamHandler> streamHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStreamHandler, Boolean>());
 
-	private final Environment environment;
-	private final Reactor reactor;
-	
-	/**
-	 * @param environment
-	 * @param reactor
-	 */
-	public KixmppEventEngine(Environment environment, Reactor reactor) {
-		this(null, environment, reactor);
-	}
-
-	/**
-	 * @param environment
-	 * @param prefix
-	 * @param reactor
-	 */
-	public KixmppEventEngine(String prefix, Environment environment, Reactor reactor) {
-		assert reactor != null : "Argument 'reactor' cannot be null";
-		
-		this.prefix = prefix;
-		this.environment = environment;
-		this.reactor = reactor;
-	}
-	
-	/**
-	 * Creates a {@link Deferred} object for future execution.
-	 * 
-	 * @return
-	 */
-	public <T> Deferred<T, Promise<T>> defer() {
-		return Promises.defer(environment, reactor.getDispatcher());
-	}
+	private final LoadingCache<String, DispatchQueue> queues = CacheBuilder.newBuilder()
+			.expireAfterAccess(30, TimeUnit.SECONDS)
+			.build(new CacheLoader<String, DispatchQueue>() {
+				public DispatchQueue load(String key) throws Exception {
+					return Dispatch.createQueue(key);
+				}
+			});
 	
 	/**
 	 * Publishes a stanza.
@@ -96,8 +65,38 @@ public class KixmppEventEngine {
 	 * @param channel
 	 * @param element
 	 */
-	public void publish(Channel channel, Element stanza) {
-		reactor.notify(getTuple(stanza.getQualifiedName(), stanza.getNamespaceURI()), Event.wrap(Tuple.of(channel, stanza)));
+	public void publishStanza(Channel channel, Element stanza) {
+		String to = stanza.getAttributeValue("to");
+		
+		DispatchQueue queue;
+		
+		try {
+			if (to != null) {
+				queue = queues.get("address:" + to);
+			} else {
+				queue = queues.get("channel:" + channel.hashCode());
+			}
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+		
+		if (to != null) {
+			Set<KixmppStanzaHandler> recipientHandlers = stanzaHandlers.get(Tuple.from(stanza.getQualifiedName(), KixmppJid.fromRawJid(to)));
+			
+			if (recipientHandlers != null) {
+				for (KixmppStanzaHandler handler : recipientHandlers) {
+					queue.execute(new ExecuteStanzaHandler(handler, channel, stanza));
+				}
+			}
+		}
+		
+		Set<KixmppStanzaHandler> globalHandlers = stanzaHandlers.get(Tuple.from(stanza.getQualifiedName()));
+		
+		if (globalHandlers != null) {
+			for (KixmppStanzaHandler handler : globalHandlers) {
+				queue.execute(new ExecuteStanzaHandler(handler, channel, stanza));
+			}
+		}
 	}
 	
 	/**
@@ -106,7 +105,17 @@ public class KixmppEventEngine {
 	 * @param channel
 	 */
 	public void publishConnected(Channel channel) {
-		reactor.notify(getTuple("connection", "start"), Event.wrap(Tuple.of(channel)));
+		DispatchQueue queue;
+		
+		try {
+			queue = queues.get("channel:" + channel.hashCode());
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+		
+		for (KixmppConnectionHandler handler : connectionHandlers) {
+			queue.execute(new ExecuteConnectionConnectedHandler(handler, channel));
+		}
 	}
 	
 	/**
@@ -115,7 +124,17 @@ public class KixmppEventEngine {
 	 * @param channel
 	 */
 	public void publishDisconnected(Channel channel) {
-		reactor.notify(getTuple("connection", "end"), Event.wrap(Tuple.of(channel)));
+		DispatchQueue queue;
+		
+		try {
+			queue = queues.get("channel:" + channel.hashCode());
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+		
+		for (KixmppConnectionHandler handler : connectionHandlers) {
+			queue.execute(new ExecuteConnectionDisconnectedHandler(handler, channel));
+		}
 	}
 	
 	/**
@@ -124,8 +143,18 @@ public class KixmppEventEngine {
 	 * @param channel
 	 * @param streamStart
 	 */
-	public void publish(Channel channel, KixmppStreamStart streamStart) {
-		reactor.notify(getTuple("stream:stream", "http://etherx.jabber.org/streams", "start"), Event.wrap(Tuple.of(channel, streamStart)));
+	public void publishStreamStart(Channel channel, KixmppStreamStart streamStart) {
+		DispatchQueue queue;
+		
+		try {
+			queue = queues.get("channel:" + channel.hashCode());
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+		
+		for (KixmppStreamHandler handler : streamHandlers) {
+			queue.execute(new ExecuteStreamStartHandler(handler, channel, streamStart));
+		}
 	}
 	
 	/**
@@ -134,8 +163,18 @@ public class KixmppEventEngine {
 	 * @param channel
 	 * @param streamEnd
 	 */
-	public void publish(Channel channel, KixmppStreamEnd streamEnd) {
-		reactor.notify(getTuple("stream:stream", "http://etherx.jabber.org/streams", "end"), Event.wrap(Tuple.of(channel, streamEnd)));
+	public void publishStreamEnd(Channel channel, KixmppStreamEnd streamEnd) {
+		DispatchQueue queue;
+		
+		try {
+			queue = queues.get("channel:" + channel.hashCode());
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+		
+		for (KixmppStreamHandler handler : streamHandlers) {
+			queue.execute(new ExecuteStreamEndHandler(handler, channel, streamEnd));
+		}
 	}
 	
 	/**
@@ -143,39 +182,8 @@ public class KixmppEventEngine {
 	 * 
 	 * @param handler
 	 */
-	public void register(KixmppConnectionHandler handler) {
-		Tuple startKey = getTuple("connection", "start");
-		Tuple endKey = getTuple("connection", "end");
-
-		synchronized (consumers) {
-			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(startKey);
-			
-			if (consumerQueue == null) {
-				ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> newConsumerQueue = new ConcurrentLinkedQueue<>();
-				
-				consumerQueue = consumers.putIfAbsent(startKey, newConsumerQueue);
-				
-	            if (consumerQueue == null) {
-	            	consumerQueue = newConsumerQueue;
-	            }
-	        }
-			
-			consumerQueue.offer(reactor.on(Selectors.$(startKey), new ConnectionStartHandlerForwardingConsumer(handler)));
-			
-			consumerQueue = consumers.get(endKey);
-			
-			if (consumerQueue == null) {
-				ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> newConsumerQueue = new ConcurrentLinkedQueue<>();
-				
-				consumerQueue = consumers.putIfAbsent(endKey, newConsumerQueue);
-				
-	            if (consumerQueue == null) {
-	            	consumerQueue = newConsumerQueue;
-	            }
-	        }
-			
-			consumerQueue.offer(reactor.on(Selectors.$(endKey), new ConnectionEndHandlerForwardingConsumer(handler)));
-		}
+	public void registerConnectionsHandler(KixmppConnectionHandler handler) {
+		connectionHandlers.add(handler);
 	}
 	
 
@@ -184,41 +192,8 @@ public class KixmppEventEngine {
 	 * 
 	 * @param handler
 	 */
-	public void unregister(KixmppConnectionHandler handler) {
-		Tuple startKey = getTuple("connection", "start");
-		Tuple endKey = getTuple("connection", "end");
-
-		synchronized (consumers) {
-			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(startKey);
-			
-			if (consumerQueue != null) {
-				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
-				
-				while (iterator.hasNext()) {
-					Registration<Consumer<Event<Tuple>>> registration = iterator.next();
-					
-					if (registration.getObject() == handler) {
-						iterator.remove();
-						registration.cancel();
-					}
-				}
-			}
-			
-			consumerQueue = consumers.get(endKey);
-			
-			if (consumerQueue != null) {
-				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
-				
-				while (iterator.hasNext()) {
-					Registration<Consumer<Event<Tuple>>> registration = iterator.next();
-					
-					if (registration.getObject() == handler) {
-						iterator.remove();
-						registration.cancel();
-					}
-				}
-			}
-		}
+	public void unregisterConnectionHandler(KixmppConnectionHandler handler) {
+		connectionHandlers.remove(handler);
 	}
 	
 	/**
@@ -226,39 +201,8 @@ public class KixmppEventEngine {
 	 * 
 	 * @param handler
 	 */
-	public void register(KixmppStreamHandler handler) {
-		Tuple startKey = getTuple("stream:stream", "http://etherx.jabber.org/streams", "start");
-		Tuple endKey = getTuple("stream:stream", "http://etherx.jabber.org/streams", "end");
-
-		synchronized (consumers) {
-			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(startKey);
-			
-			if (consumerQueue == null) {
-				ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> newConsumerQueue = new ConcurrentLinkedQueue<>();
-				
-				consumerQueue = consumers.putIfAbsent(startKey, newConsumerQueue);
-				
-	            if (consumerQueue == null) {
-	            	consumerQueue = newConsumerQueue;
-	            }
-	        }
-			
-			consumerQueue.offer(reactor.on(Selectors.$(startKey), new StreamStartHandlerForwardingConsumer(handler)));
-			
-			consumerQueue = consumers.get(endKey);
-			
-			if (consumerQueue == null) {
-				ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> newConsumerQueue = new ConcurrentLinkedQueue<>();
-				
-				consumerQueue = consumers.putIfAbsent(endKey, newConsumerQueue);
-				
-	            if (consumerQueue == null) {
-	            	consumerQueue = newConsumerQueue;
-	            }
-	        }
-			
-			consumerQueue.offer(reactor.on(Selectors.$(endKey), new StreamEndHandlerForwardingConsumer(handler)));
-		}
+	public void registerStreamHandler(KixmppStreamHandler handler) {
+		streamHandlers.add(handler);
 	}
 	
 	/**
@@ -266,94 +210,86 @@ public class KixmppEventEngine {
 	 * 
 	 * @param handler
 	 */
-	public void unregister(KixmppStreamHandler handler) {
-		Tuple startKey = getTuple("stream:stream", "http://etherx.jabber.org/streams", "start");
-		Tuple endKey = getTuple("stream:stream", "http://etherx.jabber.org/streams", "end");
-
-		synchronized (consumers) {
-			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(startKey);
-			
-			if (consumerQueue != null) {
-				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
-				
-				while (iterator.hasNext()) {
-					Registration<Consumer<Event<Tuple>>> registration = iterator.next();
-					
-					if (registration.getObject() == handler) {
-						iterator.remove();
-						registration.cancel();
-					}
-				}
-			}
-			
-			consumerQueue = consumers.get(endKey);
-			
-			if (consumerQueue != null) {
-				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
-				
-				while (iterator.hasNext()) {
-					Registration<Consumer<Event<Tuple>>> registration = iterator.next();
-					
-					if (registration.getObject() == handler) {
-						iterator.remove();
-						registration.cancel();
-					}
-				}
-			}
-		}
+	public void unregisterStreamHandler(KixmppStreamHandler handler) {
+		streamHandlers.remove(handler);
 	}
 
 	/**
 	 * Registers a stanza handler.
 	 * 
 	 * @param qualifiedName
-	 * @param namespace
+	 * @param jid
 	 * @param handler
 	 */
-	public void register(String qualifiedName, String namespace, KixmppStanzaHandler handler) {
-		synchronized (consumers) {
-			Tuple key = getTuple(qualifiedName, namespace);
-			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(key);
+	public void registerStanzaHandler(KixmppJid jid, String qualifiedName, KixmppStanzaHandler handler) {
+		Tuple key = Tuple.from(qualifiedName, jid);
+		
+		Set<KixmppStanzaHandler> handlers = stanzaHandlers.get(key);
+		
+		if (handlers == null) {
+			Set<KixmppStanzaHandler> newHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaHandler, Boolean>());
 			
-			if (consumerQueue == null) {
-				ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> newConsumerQueue = new ConcurrentLinkedQueue<>();
-				
-				consumerQueue = consumers.putIfAbsent(key, newConsumerQueue);
-				
-	            if (consumerQueue == null) {
-	            	consumerQueue = newConsumerQueue;
-	            }
-	        }
+			handlers = stanzaHandlers.putIfAbsent(key, newHandlers);
 			
-			consumerQueue.offer(reactor.on(Selectors.$(key), new StanzaHandlerForwardingConsumer(handler)));
-		}
+			if (handlers == null) {
+				handlers = newHandlers;
+			}
+        }
+		
+		handlers.add(handler);
+	}
+	
+	/**
+	 * Registers a stanza handler.
+	 * 
+	 * @param qualifiedName
+	 * @param jid
+	 * @param handler
+	 */
+	public void registerGlobalStanzaHandler(String qualifiedName, KixmppStanzaHandler handler) {
+		Tuple key = Tuple.from(qualifiedName);
+		
+		Set<KixmppStanzaHandler> handlers = stanzaHandlers.get(key);
+		
+		if (handlers == null) {
+			Set<KixmppStanzaHandler> newHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaHandler, Boolean>());
+			
+			handlers = stanzaHandlers.putIfAbsent(key, newHandlers);
+			
+			if (handlers == null) {
+				handlers = newHandlers;
+			}
+        }
+		
+		handlers.add(handler);
 	}
 
 	/**
 	 * Unregisters a stanza handler.
 	 * 
+	 * @param jid
 	 * @param qualifiedName
-	 * @param namespace
 	 * @param handler
 	 */
-	public void unregister(String qualifiedName, String namespace, KixmppStanzaHandler handler) {
-		synchronized (consumers) {
-			Tuple key = getTuple(qualifiedName, namespace);
-			
-			ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>> consumerQueue = consumers.get(key);
-			
-			if (consumerQueue != null) {
-				Iterator<Registration<Consumer<Event<Tuple>>>> iterator = consumerQueue.iterator();
-				
-				while (iterator.hasNext()) {
-					Registration<Consumer<Event<Tuple>>> registration = iterator.next();
-					
-					if (registration.getObject() == handler) {
-						iterator.remove();
-						registration.cancel();
-					}
-				}
-			}
+	public void unregisterStanzaHandler(KixmppJid jid, String qualifiedName, KixmppStanzaHandler handler) {
+		Set<KixmppStanzaHandler> handlers = stanzaHandlers.get(Tuple.from(qualifiedName, jid));
+		
+		if (handlers != null) {
+			handlers.remove(handler);
+		}
+	}
+	
+	/**
+	 * Unregisters a stanza handler.
+	 * 
+	 * @param qualifiedName
+	 * @param handler
+	 */
+	public void unregisterGlobalStanzaHandler(String qualifiedName, KixmppStanzaHandler handler) {
+		Set<KixmppStanzaHandler> handlers = stanzaHandlers.get(Tuple.from(qualifiedName));
+		
+		if (handlers != null) {
+			handlers.remove(handler);
 		}
 	}
 	
@@ -361,167 +297,84 @@ public class KixmppEventEngine {
 	 * Unregisters all the handlers.
 	 */
 	public void unregisterAll() {
-		synchronized (consumers) {
-			for (Entry<Tuple, ConcurrentLinkedQueue<Registration<Consumer<Event<Tuple>>>>> entry : consumers.entrySet()) {
-				Registration<?> registration = null;
-				
-				while ((registration = entry.getValue().poll()) != null) {
-					registration.cancel();
-				}
-			}
-			
-			consumers.clear();
-		}
+		stanzaHandlers.clear();
+		connectionHandlers.clear();
+		streamHandlers.clear();
 	}
 	
-	/**
-	 * Gets a tuple.
-	 * 
-	 * @param qualifiedName
-	 * @param namespace
-	 * @return
-	 */
-	private Tuple getTuple(String qualifiedName, String namespace) {
-		if (prefix != null) {
-			return Tuple.of(prefix, qualifiedName, namespace);
-		} else {
-			return Tuple.of(qualifiedName, namespace);
-		}
-	}
-	
-	/**
-	 * Gets a tuple.
-	 * 
-	 * @param qualifiedName
-	 * @param namespace
-	 * @param action
-	 * @return
-	 */
-	private Tuple getTuple(String qualifiedName, String namespace, String action) {
-		if (prefix != null) {
-			return Tuple.of(prefix, qualifiedName, namespace, action);
-		} else {
-			return Tuple.of(qualifiedName, namespace, action);
-		}
-	}
-	
-	/**
-	 * A consumer that forwards the stanza to a handler.
-	 * 
-	 * @author ebahtijaragic
-	 */
-	private static class StanzaHandlerForwardingConsumer implements Consumer<Event<Tuple>> {
+	private static class ExecuteStanzaHandler extends Task {
 		private final KixmppStanzaHandler handler;
+		private final Channel channel;
+		private final Element stanza;
 		
-		/**
-		 * @param handler
-		 */
-		public StanzaHandlerForwardingConsumer(KixmppStanzaHandler handler) {
+		public ExecuteStanzaHandler(KixmppStanzaHandler handler, Channel channel, Element stanza) {
 			this.handler = handler;
+			this.channel = channel;
+			this.stanza = stanza;
 		}
 
-		public void accept(Event<Tuple> t) {
-			try {
-				handler.handle((Channel)t.getData().toArray()[0], (Element)t.getData().toArray()[1]);
-			} catch (Exception e) {
-				logger.error("Error while executing handler", e);
-			}
+		public void run() {
+			handler.handle(channel, stanza);
 		}
 	}
 	
-	/**
-	 * A consumer that forwards the stream start to a handler.
-	 * 
-	 * @author ebahtijaragic
-	 */
-	private static class StreamStartHandlerForwardingConsumer implements Consumer<Event<Tuple>> {
-		private final KixmppStreamHandler handler;
-		
-		/**
-		 * @param handler
-		 */
-		public StreamStartHandlerForwardingConsumer(KixmppStreamHandler handler) {
-			this.handler = handler;
-		}
-
-		public void accept(Event<Tuple> t) {
-			try {
-				handler.handleStreamStart((Channel)t.getData().toArray()[0], (KixmppStreamStart)t.getData().toArray()[1]);
-			} catch (Exception e) {
-				logger.error("Error while executing handler", e);
-			}
-		}
-	}
-	
-	/**
-	 * A consumer that forwards the stream end to a handler.
-	 * 
-	 * @author ebahtijaragic
-	 */
-	private static class StreamEndHandlerForwardingConsumer implements Consumer<Event<Tuple>> {
-		private final KixmppStreamHandler handler;
-		
-		/**
-		 * @param handler
-		 */
-		public StreamEndHandlerForwardingConsumer(KixmppStreamHandler handler) {
-			this.handler = handler;
-		}
-
-		public void accept(Event<Tuple> t) {
-			try {
-				handler.handleStreamEnd((Channel)t.getData().toArray()[0], (KixmppStreamEnd)t.getData().toArray()[1]);
-			} catch (Exception e) {
-				logger.error("Error while executing handler", e);
-			}
-		}
-	}
-	
-	/**
-	 * A consumer that forwards the connection start to a handler.
-	 * 
-	 * @author ebahtijaragic
-	 */
-	private static class ConnectionStartHandlerForwardingConsumer implements Consumer<Event<Tuple>> {
+	private static class ExecuteConnectionConnectedHandler extends Task {
 		private final KixmppConnectionHandler handler;
+		private final Channel channel;
 		
-		/**
-		 * @param handler
-		 */
-		public ConnectionStartHandlerForwardingConsumer(KixmppConnectionHandler handler) {
+		public ExecuteConnectionConnectedHandler(KixmppConnectionHandler handler, Channel channel) {
 			this.handler = handler;
+			this.channel = channel;
 		}
 
-		public void accept(Event<Tuple> t) {
-			try {
-				handler.handleConnected((Channel)t.getData().toArray()[0]);
-			} catch (Exception e) {
-				logger.error("Error while executing handler", e);
-			}
+		public void run() {
+			handler.handleConnected(channel);
 		}
 	}
 	
-	/**
-	 * A consumer that forwards the stream end to a handler.
-	 * 
-	 * @author ebahtijaragic
-	 */
-	private static class ConnectionEndHandlerForwardingConsumer implements Consumer<Event<Tuple>> {
+	private static class ExecuteConnectionDisconnectedHandler extends Task {
 		private final KixmppConnectionHandler handler;
+		private final Channel channel;
 		
-		/**
-		 * @param handler
-		 */
-		public ConnectionEndHandlerForwardingConsumer(KixmppConnectionHandler handler) {
+		public ExecuteConnectionDisconnectedHandler(KixmppConnectionHandler handler, Channel channel) {
 			this.handler = handler;
+			this.channel = channel;
 		}
 
-		public void accept(Event<Tuple> t) {
-			try {
-				handler.handleDisconnected((Channel)t.getData().toArray()[0]);
-			} catch (Exception e) {
-				logger.error("Error while executing handler", e);
-			}
+		public void run() {
+			handler.handleDisconnected(channel);
+		}
+	}
+	
+	private static class ExecuteStreamStartHandler extends Task {
+		private final KixmppStreamHandler handler;
+		private final Channel channel;
+		private final KixmppStreamStart start;
+		
+		public ExecuteStreamStartHandler(KixmppStreamHandler handler, Channel channel, KixmppStreamStart start) {
+			this.handler = handler;
+			this.channel = channel;
+			this.start = start;
+		}
+
+		public void run() {
+			handler.handleStreamStart(channel, start);
+		}
+	}
+	
+	private static class ExecuteStreamEndHandler extends Task {
+		private final KixmppStreamHandler handler;
+		private final Channel channel;
+		private final KixmppStreamEnd end;
+		
+		public ExecuteStreamEndHandler(KixmppStreamHandler handler, Channel channel, KixmppStreamEnd end) {
+			this.handler = handler;
+			this.channel = channel;
+			this.end = end;
+		}
+
+		public void run() {
+			handler.handleStreamEnd(channel, end);
 		}
 	}
 }

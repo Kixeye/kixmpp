@@ -44,9 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jdom2.Attribute;
@@ -56,13 +54,8 @@ import org.jdom2.output.XMLOutputter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import reactor.core.Environment;
-import reactor.core.Reactor;
-import reactor.core.composable.Deferred;
-import reactor.core.composable.Promise;
-import reactor.core.spec.Reactors;
-import reactor.event.registry.Registration;
-
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.kixeye.kixmpp.KixmppAuthException;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppException;
@@ -82,15 +75,11 @@ import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 public class KixmppClient implements AutoCloseable {
 	private static final Logger logger = LoggerFactory.getLogger(KixmppClient.class);
 	
-	private final String clientId = UUID.randomUUID().toString().replace("-", "");
-	
     private final ConcurrentHashMap<KixmppClientOption<?>, Object> clientOptions = new ConcurrentHashMap<KixmppClientOption<?>, Object>();
 	private final Bootstrap bootstrap;
 	
 	private final KixmppEventEngine eventEngine;
 	
-	private final ConcurrentLinkedQueue<Registration<?>> consumerRegistrations = new ConcurrentLinkedQueue<>();
-
 	private final SslContext sslContext;
 	
 	private final Set<KixmppStanzaInterceptor> interceptors = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStanzaInterceptor, Boolean>());
@@ -98,8 +87,8 @@ public class KixmppClient implements AutoCloseable {
 	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 	private final ConcurrentHashMap<String, KixmppClientModule> modules = new ConcurrentHashMap<>();
 	
-	private Deferred<KixmppClient, Promise<KixmppClient>> deferredLogin;
-	private Deferred<KixmppClient, Promise<KixmppClient>> deferredDisconnect;
+	private SettableFuture<KixmppClient> deferredLogin;
+	private SettableFuture<KixmppClient> deferredDisconnect;
 	
 	private String username;
 	private String password;
@@ -128,21 +117,9 @@ public class KixmppClient implements AutoCloseable {
 	 * @param sslContext
 	 */
 	public KixmppClient(SslContext sslContext) {
-		this(new NioEventLoopGroup(), new Environment(), Environment.THREAD_POOL, sslContext);
+		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext);
 	}
 
-	/**
-	 * Creates a new {@link KixmppClient}.
-	 * 
-	 * @param eventLoopGroup
-	 * @param environment
-	 * @param dispatcher
-	 * @param sslContext
-	 */
-	public KixmppClient(EventLoopGroup eventLoopGroup, Environment environment, String dispatcher, SslContext sslContext) {
-		this(eventLoopGroup, environment, Reactors.reactor(environment, dispatcher), sslContext);
-	}
-	
 	/**
 	 * Creates a new {@link KixmppClient}.
 	 * 
@@ -151,7 +128,7 @@ public class KixmppClient implements AutoCloseable {
 	 * @param reactor
 	 * @param sslContext
 	 */
-	public KixmppClient(EventLoopGroup eventLoopGroup, Environment environment, Reactor reactor, SslContext sslContext) {
+	public KixmppClient(EventLoopGroup eventLoopGroup, KixmppEventEngine eventEngine, SslContext sslContext) {
 		assert sslContext.isClient() : "The given SslContext must be a client context.";
 		
 		bootstrap = new Bootstrap()
@@ -162,7 +139,7 @@ public class KixmppClient implements AutoCloseable {
 			.handler(new KixmppClientChannelInitializer());
 		
 		this.sslContext = sslContext;
-		this.eventEngine = new KixmppEventEngine(clientId, environment, reactor);
+		this.eventEngine = eventEngine;
 		
 		// set modules to be registered
 		this.modulesToRegister.add(MucKixmppClientModule.class.getName());
@@ -175,30 +152,30 @@ public class KixmppClient implements AutoCloseable {
 	 * @param hostname
 	 * @param port
 	 */
-	public Promise<KixmppClient> connect(String hostname, int port, String domain) {
+	public ListenableFuture<KixmppClient> connect(String hostname, int port, String domain) {
 		checkAndSetState(State.CONNECTING, State.DISCONNECTED);
 		
 		this.domain = domain;
 		
 		setUp();
 		
-		final Deferred<KixmppClient, Promise<KixmppClient>> deferred = eventEngine.defer();
+		final SettableFuture<KixmppClient> responseFuture = SettableFuture.create();
 		
 		bootstrap.connect(hostname, port).addListener(new GenericFutureListener<Future<? super Void>>() {
 			public void operationComplete(Future<? super Void> future) throws Exception {
 				if (future.isSuccess()) {
 					if (state.compareAndSet(State.CONNECTING, State.CONNECTED)) {
 						channel.set(((ChannelFuture)future).channel());
-						deferred.accept(KixmppClient.this);
+						responseFuture.set(KixmppClient.this);
 					}
 				} else {
 					state.set(State.DISCONNECTED);
-					deferred.accept(future.cause());
+					responseFuture.setException(future.cause());
 				}
 			}
 		});
 		
-		return deferred.compose();
+		return responseFuture;
 	}
 	
 	/**
@@ -209,36 +186,36 @@ public class KixmppClient implements AutoCloseable {
 	 * @param resource
 	 * @throws InterruptedException 
 	 */
-	public Promise<KixmppClient> login(String username, String password, String resource) throws InterruptedException {
+	public ListenableFuture<KixmppClient> login(String username, String password, String resource) throws InterruptedException {
 		checkAndSetState(State.LOGGING_IN, State.CONNECTED);
 		
 		this.username = username;
 		this.password = password;
 		this.resource = resource;
 
-		deferredLogin = eventEngine.defer();
+		deferredLogin = SettableFuture.create();
 		
 		KixmppCodec.sendXmppStreamRootStart(channel.get(), null, domain);
 		
-		return deferredLogin.compose();
+		return deferredLogin;
 	}
 	
 	/**
 	 * Disconnects from the current server.
 	 */ 
-	public Promise<KixmppClient> disconnect() {
+	public ListenableFuture<KixmppClient> disconnect() {
 		if (state.get() == State.DISCONNECTED) {
-			final Deferred<KixmppClient, Promise<KixmppClient>> deferred = eventEngine.defer();
-			deferred.accept(this);
+			final SettableFuture<KixmppClient> deferred = SettableFuture.create();
+			deferred.set(this);
 			
-			return deferred.compose();
+			return deferred;
 		} else if (state.get() == State.DISCONNECTING) {
-			return deferredDisconnect.compose();
+			return deferredDisconnect;
 		}
 		
 		checkAndSetState(State.DISCONNECTING, State.CONNECTED, State.LOGGED_IN, State.LOGGING_IN);
 
-		deferredDisconnect = eventEngine.defer();
+		deferredDisconnect = SettableFuture.create();
 		
 		cleanUp();
 		
@@ -249,17 +226,17 @@ public class KixmppClient implements AutoCloseable {
 				public void operationComplete(Future<? super Void> arg0) throws Exception {
 					currentChannel.close().addListener(new GenericFutureListener<Future<? super Void>>() {
 						public void operationComplete(Future<? super Void> arg0) throws Exception {
-							deferredDisconnect.accept(KixmppClient.this);
+							deferredDisconnect.set(KixmppClient.this);
 							state.set(State.DISCONNECTED);
 						}
 					});
 				}
 			});
 		} else {
-			deferredDisconnect.accept(new KixmppException("No channel available to close."));
+			deferredDisconnect.setException(new KixmppException("No channel available to close."));
 		}
 
-		return deferredDisconnect.compose();
+		return deferredDisconnect;
 	}
 
 	/**
@@ -409,14 +386,14 @@ public class KixmppClient implements AutoCloseable {
     private void setUp() {
     	if (state.get() == State.CONNECTING) {
     		// this client deals with the following stanzas
-    		eventEngine.register("stream:features", "http://etherx.jabber.org/streams", streamFeaturesHandler);
+    		eventEngine.registerGlobalStanzaHandler("stream:features", streamFeaturesHandler);
 
-    		eventEngine.register("proceed", "urn:ietf:params:xml:ns:xmpp-tls", tlsResponseHandler);
+    		eventEngine.registerGlobalStanzaHandler("proceed", tlsResponseHandler);
     		
-    		eventEngine.register("success", "urn:ietf:params:xml:ns:xmpp-sasl", authResultHandler);
-    		eventEngine.register("failure", "urn:ietf:params:xml:ns:xmpp-sasl", authResultHandler);
+    		eventEngine.registerGlobalStanzaHandler("success", authResultHandler);
+    		eventEngine.registerGlobalStanzaHandler("failure", authResultHandler);
 
-    		eventEngine.register("iq", "jabber:client", iqResultHandler);
+    		eventEngine.registerGlobalStanzaHandler("iq", iqResultHandler);
     		
     		// register all modules
     		for (String moduleClassName : modulesToRegister) {
@@ -430,12 +407,6 @@ public class KixmppClient implements AutoCloseable {
      */
     private void cleanUp() {
     	if (state.get() == State.DISCONNECTING) {
-    		Registration<?> registration = null;
-    		
-    		while ((registration = consumerRegistrations.poll()) != null) {
-    			registration.cancel();
-    		}
-    		
     		for (Entry<String, KixmppClientModule> entry : modules.entrySet()) {
     			entry.getValue().uninstall(this);
     		}
@@ -519,7 +490,7 @@ public class KixmppClient implements AutoCloseable {
 							
 							KixmppCodec.sendXmppStreamRootStart(KixmppClient.this.channel.get(), null, domain);
 						} else {
-							deferredLogin.accept(new KixmppAuthException("tls failed"));
+							deferredLogin.setException(new KixmppAuthException("tls failed"));
 						}
 					}
 				});
@@ -555,7 +526,7 @@ public class KixmppClient implements AutoCloseable {
 					break;
 				default:
 					// fail
-					deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(authResult)));
+					deferredLogin.setException(new KixmppAuthException(new XMLOutputter().outputString(authResult)));
 					break;
 			}
 		}
@@ -591,18 +562,18 @@ public class KixmppClient implements AutoCloseable {
 							KixmppClient.this.channel.get().writeAndFlush(startSession);
 						} else {
 							// fail
-							deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(iqResult)));
+							deferredLogin.setException(new KixmppAuthException(new XMLOutputter().outputString(iqResult)));
 						}
 						break;
 					case "session":
 						if (typeAttribute != null && "result".equals(typeAttribute.getValue())) {
-							deferredLogin.accept(KixmppClient.this);
+							deferredLogin.set(KixmppClient.this);
 							state.set(State.LOGGED_IN);
 							
 							logger.debug("Logged in as: " + jid);
 						} else {
 							// fail
-							deferredLogin.accept(new KixmppAuthException(new XMLOutputter().outputString(iqResult)));
+							deferredLogin.setException(new KixmppAuthException(new XMLOutputter().outputString(iqResult)));
 						}
 
 						// no need to keep reference around
@@ -658,7 +629,7 @@ public class KixmppClient implements AutoCloseable {
 				}
 	
 				if (!rejected) {
-					eventEngine.publish(ctx.channel(), stanza);
+					eventEngine.publishStanza(ctx.channel(), stanza);
 				}
 			}
 		}

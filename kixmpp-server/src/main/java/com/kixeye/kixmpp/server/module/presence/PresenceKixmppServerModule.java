@@ -49,14 +49,14 @@ public class PresenceKixmppServerModule implements KixmppServerModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getEventEngine().register("presence", null, PRESENCE_HANDLER);
+		this.server.getEventEngine().registerGlobalStanzaHandler("presence", PRESENCE_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getEventEngine().unregister("presence", null, PRESENCE_HANDLER);
+		this.server.getEventEngine().unregisterGlobalStanzaHandler("presence", PRESENCE_HANDLER);
 	}
 
 	/**

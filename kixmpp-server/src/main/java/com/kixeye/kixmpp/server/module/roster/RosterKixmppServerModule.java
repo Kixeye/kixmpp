@@ -45,14 +45,14 @@ public class RosterKixmppServerModule implements KixmppServerModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getEventEngine().register("iq", null, ROSTER_HANDLER);
+		this.server.getEventEngine().registerGlobalStanzaHandler("iq", ROSTER_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getEventEngine().unregister("iq", null, ROSTER_HANDLER);
+		this.server.getEventEngine().unregisterGlobalStanzaHandler("iq", ROSTER_HANDLER);
 	}
 
 	/**

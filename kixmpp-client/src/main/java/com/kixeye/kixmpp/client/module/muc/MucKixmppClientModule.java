@@ -148,16 +148,16 @@ public class MucKixmppClientModule implements KixmppClientModule {
 	public void install(KixmppClient client) {
 		this.client = client;
 		
-		client.getEventEngine().register("message", "jabber:client", mucMessageHandler);
-		client.getEventEngine().register("presence", "jabber:client", mucPresenceHandler);
+		client.getEventEngine().registerGlobalStanzaHandler("message", mucMessageHandler);
+		client.getEventEngine().registerGlobalStanzaHandler("presence", mucPresenceHandler);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.client.module.KixmppClientModule#uninstall(com.kixeye.kixmpp.client.KixmppClient)
 	 */
 	public void uninstall(KixmppClient client) {
-		client.getEventEngine().unregister("message", "jabber:client", mucMessageHandler);
-		client.getEventEngine().unregister("presence", "jabber:client", mucPresenceHandler);
+		client.getEventEngine().unregisterGlobalStanzaHandler("message", mucMessageHandler);
+		client.getEventEngine().unregisterGlobalStanzaHandler("presence", mucPresenceHandler);
 	}
 	
 	private KixmppStanzaHandler mucPresenceHandler = new KixmppStanzaHandler() {

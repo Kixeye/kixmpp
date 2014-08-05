@@ -125,8 +125,8 @@ public class KixmppClientTest {
 	@Test
 	public void testSimpleConnect() throws Exception {
 		try (KixmppClient client = new KixmppClient(createSslContext())) {
-			Assert.assertNotNull(client.connect("localhost", port, domain).await(2, TimeUnit.SECONDS));
-			Assert.assertNotNull(client.login(username, password, resource).await(2, TimeUnit.SECONDS));
+			Assert.assertNotNull(client.connect("localhost", port, domain).get(2, TimeUnit.SECONDS));
+			Assert.assertNotNull(client.login(username, password, resource).get(2, TimeUnit.SECONDS));
 			client.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
 		}
 	}

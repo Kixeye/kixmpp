@@ -50,16 +50,16 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getEventEngine().register("presence", null, JOIN_ROOM_HANDLER);
-		this.server.getEventEngine().register("message", null, ROOM_MESSAGE_HANDLER);
+		this.server.getEventEngine().registerGlobalStanzaHandler("presence", JOIN_ROOM_HANDLER);
+		this.server.getEventEngine().registerGlobalStanzaHandler("message", ROOM_MESSAGE_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getEventEngine().unregister("presence", null, JOIN_ROOM_HANDLER);
-		this.server.getEventEngine().unregister("message", null, ROOM_MESSAGE_HANDLER);
+		this.server.getEventEngine().unregisterGlobalStanzaHandler("presence", JOIN_ROOM_HANDLER);
+		this.server.getEventEngine().unregisterGlobalStanzaHandler("message", ROOM_MESSAGE_HANDLER);
 	}
 	
 	/**

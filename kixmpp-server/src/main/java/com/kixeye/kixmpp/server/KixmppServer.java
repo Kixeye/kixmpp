@@ -12,8 +12,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
@@ -29,16 +27,13 @@ import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import reactor.core.Environment;
-import reactor.core.Reactor;
-import reactor.core.composable.Deferred;
-import reactor.core.composable.Promise;
-import reactor.core.spec.Reactors;
-
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
@@ -109,7 +104,7 @@ public class KixmppServer implements AutoCloseable {
 	 * @param domain
 	 */
 	public KixmppServer(String domain) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.WORK_QUEUE, DEFAULT_SOCKET_ADDRESS, domain);
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), DEFAULT_SOCKET_ADDRESS, domain);
 	}
 	
 	/**
@@ -119,40 +114,24 @@ public class KixmppServer implements AutoCloseable {
 	 * @param domain
 	 */
 	public KixmppServer(InetSocketAddress bindAddress, String domain) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new Environment(), Environment.THREAD_POOL, bindAddress, domain);
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), bindAddress, domain);
 	}
 	
 	/**
 	 * Creates a new {@link KixmppClient}.
 	 * 
 	 * @param workerGroup
-	 * @param bossGroup
-	 * @param environment
-	 * @param dispatcher
-	 * @param bindAddress
-	 * @param domain
-	 */
-	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, String dispatcher, InetSocketAddress bindAddress, String domain) {
-		this(workerGroup, bossGroup, environment, Reactors.reactor(environment, dispatcher), bindAddress, domain);
-	}
-	
-	/**
-	 * Creates a new {@link KixmppClient}.
-	 * 
-	 * @param workerGroup
-	 * @param environment
-	 * @param reactor
+	 * @param eventEngine
 	 * @param bindAddress
 	 * @param domain
 	 * @param sslContext
 	 */
-	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, Environment environment, Reactor reactor, InetSocketAddress bindAddress, String domain) {
+	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, KixmppEventEngine eventEngine, InetSocketAddress bindAddress, String domain) {
 		bootstrap = new ServerBootstrap()
 			.group(bossGroup, workerGroup)
 			.channel(NioServerSocketChannel.class)
 			.childHandler(new ChannelInitializer<SocketChannel>() {
 				protected void initChannel(SocketChannel ch) throws Exception {
-                    ch.pipeline().addLast(new LoggingHandler(LogLevel.INFO));
 					ch.pipeline().addLast(new KixmppCodec());
 					ch.pipeline().addLast(new KixmppServerMessageHandler());
 				}
@@ -160,7 +139,7 @@ public class KixmppServer implements AutoCloseable {
 
 		this.bindAddress = bindAddress;
 		this.domain = domain.toLowerCase();
-		this.eventEngine = new KixmppEventEngine(environment, reactor);
+		this.eventEngine = eventEngine;
 
 		this.modulesToRegister.add(FeaturesKixmppServerModule.class.getName());
 		this.modulesToRegister.add(SaslKixmppServerModule.class.getName());
@@ -178,7 +157,7 @@ public class KixmppServer implements AutoCloseable {
 	 * @param port
 	 * @throws Exception
 	 */
-	public Promise<KixmppServer> start() throws Exception {
+	public ListenableFuture<KixmppServer> start() throws Exception {
 		checkAndSetState(State.STARTING, State.STOPPED);
 		
 		logger.info("Starting Kixmpp Server on [{}]...", bindAddress);
@@ -188,7 +167,7 @@ public class KixmppServer implements AutoCloseable {
 			installModule(moduleClassName);
 		}
 		
-		final Deferred<KixmppServer, Promise<KixmppServer>> deferred = eventEngine.defer();
+		final SettableFuture<KixmppServer> responseFuture = SettableFuture.create();
 
 		channelFuture.set(bootstrap.bind(bindAddress));
 		
@@ -201,17 +180,17 @@ public class KixmppServer implements AutoCloseable {
 					channel.set(channelFuture.get().channel());
 					state.set(State.STARTED);
 					channelFuture.set(null);
-					deferred.accept(KixmppServer.this);
+					responseFuture.set(KixmppServer.this);
 				} else {
 					logger.error("Unable to start Kixmpp Server on [{}]", bindAddress, future.cause());
 					
 					state.set(State.STOPPED);
-					deferred.accept(future.cause());
+					responseFuture.setException(future.cause());
 				}
 			}
 		});
 		
-		return deferred.compose();
+		return responseFuture;
 	}
 	
 	/**
@@ -219,7 +198,7 @@ public class KixmppServer implements AutoCloseable {
 	 * 
 	 * @return
 	 */
-	public Promise<KixmppServer> stop() {
+	public ListenableFuture<KixmppServer> stop() {
 		checkAndSetState(State.STOPPING, State.STARTED, State.STARTING);
 
 		logger.info("Stopping Kixmpp Server...");
@@ -227,8 +206,8 @@ public class KixmppServer implements AutoCloseable {
 		for (Entry<String, KixmppServerModule> entry : modules.entrySet()) {
 			entry.getValue().uninstall(this);
 		}
-		
-		final Deferred<KixmppServer, Promise<KixmppServer>> deferred = eventEngine.defer();
+
+		final SettableFuture<KixmppServer> responseFuture = SettableFuture.create();
 
 		ChannelFuture serverChannelFuture = channelFuture.get();
 		
@@ -247,18 +226,18 @@ public class KixmppServer implements AutoCloseable {
 					
 					eventEngine.unregisterAll();
 					
-					deferred.accept(KixmppServer.this);
+					responseFuture.set(KixmppServer.this);
 				}
 			});
 		} else {
 			logger.info("Stopped Kixmpp Server");
 			
 			state.set(State.STOPPED);
-			
-			deferred.accept(KixmppServer.this);
+
+			responseFuture.set(KixmppServer.this);
 		}
 		
-		return deferred.compose();
+		return responseFuture;
 	}
 
 	/**
@@ -442,16 +421,16 @@ public class KixmppServer implements AutoCloseable {
 				}
 				
 				if (!rejected) {
-					eventEngine.publish(ctx.channel(), stanza);
+					eventEngine.publishStanza(ctx.channel(), stanza);
 				}
 			} else if (msg instanceof KixmppStreamStart) {
 				KixmppStreamStart streamStart = (KixmppStreamStart)msg;
 
-				eventEngine.publish(ctx.channel(), streamStart);
+				eventEngine.publishStreamStart(ctx.channel(), streamStart);
 			} else if (msg instanceof KixmppStreamEnd) {
 				KixmppStreamEnd streamEnd = (KixmppStreamEnd)msg;
 
-				eventEngine.publish(ctx.channel(), streamEnd);
+				eventEngine.publishStreamEnd(ctx.channel(), streamEnd);
 			} else {
 				logger.error("Unknown message type [{}] from Channel [{}]", msg, ctx.channel());
 			}

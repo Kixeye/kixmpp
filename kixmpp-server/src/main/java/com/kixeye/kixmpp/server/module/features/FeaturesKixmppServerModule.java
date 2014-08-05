@@ -48,14 +48,14 @@ public class FeaturesKixmppServerModule implements KixmppServerModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getEventEngine().register(SERVER_FEATURE_HANDLER);
+		this.server.getEventEngine().registerStreamHandler(SERVER_FEATURE_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getEventEngine().unregister(SERVER_FEATURE_HANDLER);
+		this.server.getEventEngine().unregisterStreamHandler(SERVER_FEATURE_HANDLER);
 	}
 
 	/**

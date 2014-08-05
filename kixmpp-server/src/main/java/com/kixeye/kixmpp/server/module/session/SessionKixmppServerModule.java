@@ -49,14 +49,14 @@ public class SessionKixmppServerModule implements KixmppServerModule {
 	public void install(KixmppServer server) {
 		this.server = server;
 		
-		this.server.getEventEngine().register("iq", null, SESSION_HANDLER);
+		this.server.getEventEngine().registerGlobalStanzaHandler("iq", SESSION_HANDLER);
 	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#uninstall(com.kixeye.kixmpp.server.KixmppServer)
 	 */
 	public void uninstall(KixmppServer server) {
-		this.server.getEventEngine().unregister("iq", null, SESSION_HANDLER);
+		this.server.getEventEngine().unregisterGlobalStanzaHandler("iq", SESSION_HANDLER);
 	}
 
 	/**
