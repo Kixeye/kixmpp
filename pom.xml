@@ -19,6 +19,7 @@
 	<modules>
 		<module>kixmpp-core</module>
 		<module>kixmpp-client</module>
+        <module>kixmpp-p2p</module>
 		<module>kixmpp-server</module>
 	</modules>
 
@@ -64,7 +65,8 @@
 		<reactor.version>1.1.3.RELEASE</reactor.version>
 		<hawtdispatch.version>1.21</hawtdispatch.version>
         <guava.version>14.0.1</guava.version>
-		
+        <protostuff.version>1.0.8</protostuff.version>
+
         <!-- Plugins -->
         <license-maven-plugin.version>1.7</license-maven-plugin.version>
 	</properties>
