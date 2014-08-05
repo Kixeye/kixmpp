@@ -35,8 +35,34 @@ public class Tuple {
 		this.values = values;
 	}
 	
+	/**
+	 * Forms a tuple from some varargs.
+	 * 
+	 * @param values
+	 * @return
+	 */
 	public static Tuple from(Object... values) {
 		return new Tuple(values);
+	}
+	
+	/**
+	 * Gets a value in a tuple at the given index.
+	 * 
+	 * @param i
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public <T> T get(int i) {
+		return (T)values[i];
+	}
+	
+	/**
+	 * Returns the size of the tuple.
+	 * 
+	 * @return
+	 */
+	public int size() {
+		return values.length;
 	}
 
 	@Override
