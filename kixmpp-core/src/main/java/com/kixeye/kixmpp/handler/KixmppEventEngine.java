@@ -218,7 +218,7 @@ public class KixmppEventEngine {
 	 * 
 	 * @param handler
 	 */
-	public void registerConnectionsHandler(KixmppConnectionHandler handler) {
+	public void registerConnectionHandler(KixmppConnectionHandler handler) {
 		connectionHandlers.add(handler);
 	}
 	
