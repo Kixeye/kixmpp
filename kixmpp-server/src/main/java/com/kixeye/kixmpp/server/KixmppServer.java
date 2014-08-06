@@ -31,9 +31,12 @@ import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.kixeye.kixmpp.KixmppCodec;
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
@@ -105,6 +108,10 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	private final AtomicReference<ChannelFuture> channelFuture = new AtomicReference<>();
 	private final AtomicReference<Channel> channel = new AtomicReference<>();
 	private AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
+	
+	private final Cache<KixmppJid, Channel> jidChannel = CacheBuilder
+			.newBuilder()
+			.weakValues().build();
 
     private static enum State {
 		STARTING,
@@ -382,6 +389,26 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
      */
     public boolean removeInterceptor(KixmppStanzaInterceptor interceptor) {
     	return interceptors.remove(interceptor);
+    }
+    
+    /**
+     * Gets a channel that is assigned to this JID.
+     * 
+     * @param jid
+     * @return
+     */
+    public Channel getChannel(KixmppJid jid) {
+    	return jidChannel.getIfPresent(jid);
+    }
+    
+    /**
+     * Adds a channel mapping.
+     * 
+     * @param jid
+     * @param channel
+     */
+    public void addChannelMapping(KixmppJid jid, Channel channel) {
+    	jidChannel.put(jid, channel);
     }
     
 	/**
