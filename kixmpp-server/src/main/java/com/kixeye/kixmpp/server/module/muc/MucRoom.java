@@ -20,7 +20,6 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
@@ -138,7 +137,7 @@ public class MucRoom {
         message.setAttribute("type", type);
         message.setAttribute("id", id);
 
-        Element body = new Element("body",Namespace.getNamespace("http://jabber.org/protocol/muc"));
+        Element body = new Element("body", Namespace.getNamespace("http://jabber.org/protocol/muc"));
         body.addContent(bodyText);
 
         message.addContent(body);
@@ -192,7 +191,7 @@ public class MucRoom {
         userChannelToInvite.writeAndFlush(message);
     }
 
-    public Collection<Participant> getParticipants(){
+    public Collection<Participant> getParticipants() {
         return Lists.newArrayList(participantsByNickname.values());
     }
 
@@ -211,19 +210,19 @@ public class MucRoom {
         }
     }
 
-    public static class Participant{
+    public static class Participant {
         private KixmppJid jid;
         private String nickname;
         private Channel channel;
         //private Role role...someday
 
-        public Participant(KixmppJid jid, String nickname, Channel channel){
+        public Participant(KixmppJid jid, String nickname, Channel channel) {
             this.jid = jid;
             this.nickname = nickname;
             this.channel = channel;
         }
 
-        public String getNickname(){
+        public String getNickname() {
             return nickname;
         }
 
