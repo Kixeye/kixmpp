@@ -1,15 +1,5 @@
 package com.kixeye.kixmpp.server;
 
-import com.kixeye.kixmpp.p2p.ClusterClient;
-import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
-import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
-import com.kixeye.kixmpp.p2p.listener.ClusterListener;
-import com.kixeye.kixmpp.p2p.node.NodeId;
-import com.kixeye.kixmpp.server.cluster.task.ClusterTask;
-import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
-import com.kixeye.kixmpp.server.cluster.task.RoomTask;
-import com.kixeye.kixmpp.server.module.muc.MucRoom;
-import com.kixeye.kixmpp.server.module.muc.MucService;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
@@ -47,14 +37,25 @@ import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
+import com.kixeye.kixmpp.p2p.ClusterClient;
+import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
+import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
+import com.kixeye.kixmpp.p2p.listener.ClusterListener;
+import com.kixeye.kixmpp.p2p.node.NodeId;
+import com.kixeye.kixmpp.server.cluster.task.ClusterTask;
+import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
+import com.kixeye.kixmpp.server.cluster.task.RoomTask;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import com.kixeye.kixmpp.server.module.disco.DiscoKixmppServerModule;
 import com.kixeye.kixmpp.server.module.features.FeaturesKixmppServerModule;
 import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
+import com.kixeye.kixmpp.server.module.muc.MucRoom;
+import com.kixeye.kixmpp.server.module.muc.MucService;
 import com.kixeye.kixmpp.server.module.presence.PresenceKixmppServerModule;
 import com.kixeye.kixmpp.server.module.roster.RosterKixmppServerModule;
 import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
@@ -123,6 +124,16 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 */
 	public KixmppServer(String domain) {
 		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), DEFAULT_SOCKET_ADDRESS, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery() );
+	}
+	
+	/**
+	 * Creates a new {@link KixmppServer} with the given ssl engine.
+	 * 
+	 * @param bindAddress
+	 * @param domain
+	 */
+	public KixmppServer(InetSocketAddress bindAddress, String domain) {
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), bindAddress, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery());
 	}
 	
 	/**
