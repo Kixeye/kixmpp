@@ -112,8 +112,8 @@ public class MucKixmppServerModule implements KixmppServerModule {
 			if (x != null) {
 				KixmppJid fullRoomJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
 				
-				MucService service = services.get(fullRoomJid.getDomain().replace("." + server.getDomain(), ""));
-				
+				MucService service = services.get(fullRoomJid.getDomain().toLowerCase().replace("." + server.getDomain(), ""));
+
 				if (service != null) {
 					MucRoom room = service.getRoom(fullRoomJid.getNode());
 					
@@ -133,7 +133,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 			if ("groupchat".equals(stanza.getAttributeValue("type"))) {
 				KixmppJid fullRoomJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
 
-				MucService service = services.get(fullRoomJid.getDomain().replace("." + server.getDomain(), ""));
+				MucService service = services.get(fullRoomJid.getDomain().toLowerCase().replace("." + server.getDomain(), ""));
 				
 				if (service != null) {
 					MucRoom room = service.getRoom(fullRoomJid.getNode());

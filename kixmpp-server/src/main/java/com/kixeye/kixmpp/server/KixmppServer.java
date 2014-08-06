@@ -18,27 +18,27 @@ import io.netty.util.concurrent.GenericFutureListener;
 import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 
 import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.Striped;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
-import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 import com.kixeye.kixmpp.p2p.ClusterClient;
@@ -107,9 +107,9 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	private final AtomicReference<Channel> channel = new AtomicReference<>();
 	private AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
 	
-	private final Cache<KixmppJid, Channel> jidChannel = CacheBuilder
-			.newBuilder()
-			.weakValues().build();
+	private final ConcurrentHashMap<KixmppJid, Channel> jidChannel = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<String, Set<Channel>> usernameChannel = new ConcurrentHashMap<>();
+	private final Striped<Lock> usernameChannelStripes = Striped.lock(Runtime.getRuntime().availableProcessors() * 4);
 
     private static enum State {
 		STARTING,
@@ -395,7 +395,17 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
      * @return
      */
     public Channel getChannel(KixmppJid jid) {
-    	return jidChannel.getIfPresent(jid);
+    	return jidChannel.get(jid);
+    }
+    
+    /**
+     * Gets channel by username.
+     * 
+     * @param username
+     * @return
+     */
+    public Set<Channel> getChannels(String username) {
+    	return Collections.unmodifiableSet(usernameChannel.get(username));
     }
     
     /**
@@ -406,6 +416,23 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
      */
     public void addChannelMapping(KixmppJid jid, Channel channel) {
     	jidChannel.put(jid, channel);
+    	
+    	Lock lock = usernameChannelStripes.get(jid.getNode());
+    	
+    	try {
+    		lock.lock();
+    		
+    		Set<Channel> channels = usernameChannel.get(jid.getNode());
+    		
+    		if (channels == null) {
+    			channels = new HashSet<>();
+    			channels.add(channel);
+    		}
+    		
+        	usernameChannel.put(jid.getNode(), channels);
+    	} finally {
+    		lock.unlock();
+    	}
     }
     
 	/**
@@ -532,6 +559,21 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 			logger.debug("Channel [{}] disconnected.", ctx.channel());
 
+			KixmppJid jid = ctx.channel().attr(BindKixmppServerModule.JID).get();
+			
+			if (jid != null) {
+				jidChannel.remove(jid);
+				
+				Lock lock = usernameChannelStripes.get(jid.getNode());
+				
+				try {
+					lock.lock();
+					usernameChannel.remove(jid.getNode());
+				} finally {
+					lock.unlock();
+				}
+			}
+			
 			eventEngine.publishDisconnected(ctx.channel());
 		}
 		

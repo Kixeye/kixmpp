@@ -116,11 +116,8 @@ public class KixmppServerTest {
 		try (KixmppServer server = new KixmppServer("testChat")) {
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
 
-			((InMemoryAuthenticationService) server.module(
-					SaslKixmppServerModule.class).getAuthenticationService())
-					.addUser("testUser", "testPassword");
-			server.module(MucKixmppServerModule.class).addService("conference")
-					.addRoom("someRoom");
+			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
+			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
 
 			try (KixmppClient client = new KixmppClient(
 					SslContext.newClientContext())) {
@@ -153,23 +150,18 @@ public class KixmppServerTest {
 							}
 						});
 
-				Assert.assertNotNull(client.login("testUser", "testPassword",
-						"testResource").get(2, TimeUnit.SECONDS));
-				client.module(PresenceKixmppClientModule.class).updatePresence(
-						new Presence());
+				Assert.assertNotNull(client.login("testUser", "testPassword", "testResource").get(2, TimeUnit.SECONDS));
+				client.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
 
 				Assert.assertNotNull(presences.poll(2, TimeUnit.SECONDS));
 
-				client.module(MucKixmppClientModule.class).joinRoom(
-						KixmppJid.fromRawJid("someRoom@conference.testChat"),
-						"testNick");
+				client.module(MucKixmppClientModule.class).joinRoom(KixmppJid.fromRawJid("someRoom@conference.testChat"), "testNick");
 
 				MucJoin mucJoin = mucJoins.poll(2, TimeUnit.SECONDS);
 
 				Assert.assertNotNull(mucJoin);
 
-				client.module(MucKixmppClientModule.class).sendRoomMessage(
-						mucJoin.getRoomJid(), "someMessage", "testNick");
+				client.module(MucKixmppClientModule.class).sendRoomMessage(mucJoin.getRoomJid(), "someMessage", "testNick");
 
 				MucMessage mucMessage = mucMessages.poll(2, TimeUnit.SECONDS);
 
