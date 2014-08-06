@@ -41,7 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MucRoom {
     private final KixmppJid roomJid;
     private ConcurrentHashMap<String, Participant> participantsByNickname = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Channel, String> nicknamesByChannel = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Channel, Participant> participantsByChannel = new ConcurrentHashMap<>();
 
     /**
      * @param roomJid
@@ -70,7 +70,7 @@ public class MucRoom {
             KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
             Participant participant = new Participant(jid, nickname, channel);
             if (participantsByNickname.putIfAbsent(nickname, participant) == null) {
-                nicknamesByChannel.put(channel, nickname);
+                participantsByChannel.put(channel, participant);
 
                 Element presence = new Element("presence");
                 presence.setAttribute("id", UUID.randomUUID().toString());
@@ -109,10 +109,10 @@ public class MucRoom {
      */
     public void leave(Channel channel) {
         synchronized (channel) {
-            String nickname = nicknamesByChannel.remove(channel);
+            Participant participant = participantsByChannel.remove(channel);
 
-            if (nickname != null) {
-                participantsByNickname.remove(nickname);
+            if (participant != null) {
+                participantsByNickname.remove(participant.getNickname());
             }
         }
     }
@@ -154,14 +154,14 @@ public class MucRoom {
      * @param stanza
      */
     public void broadcast(Channel channel, Element stanza) {
-        if (nicknamesByChannel.containsKey(channel)) {
+        if (participantsByChannel.containsKey(channel)) {
             Element body = new Element("body");
             body.setText(stanza.getChildText("body", Namespace.getNamespace("jabber:client")));
 
-            for (Channel userChannel : nicknamesByChannel.keySet()) {
+            for (Channel userChannel : participantsByChannel.keySet()) {
                 Element message = new Element("message");
                 message.setAttribute("id", UUID.randomUUID().toString());
-                message.setAttribute("from", roomJid.withResource(nicknamesByChannel.get(channel)).toString());
+                message.setAttribute("from", roomJid.withResource(participantsByChannel.get(channel).getNickname()).toString());
                 message.setAttribute("to", userChannel.attr(BindKixmppServerModule.JID).get().toString());
                 message.setAttribute("type", "groupchat");
                 message.addContent(body.clone());
