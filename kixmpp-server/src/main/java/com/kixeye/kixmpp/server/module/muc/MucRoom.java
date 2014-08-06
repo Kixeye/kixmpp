@@ -21,6 +21,8 @@ package com.kixeye.kixmpp.server.module.muc;
  */
 
 import com.kixeye.kixmpp.KixmppJid;
+import com.kixeye.kixmpp.server.KixmppServer;
+import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import io.netty.channel.Channel;
 import io.netty.util.concurrent.Future;
@@ -29,6 +31,7 @@ import org.jdom2.Element;
 import org.jdom2.Namespace;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * A simple muc room.
@@ -36,15 +39,26 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author ebahtijaragic
  */
 public class MucRoom {
+    private final KixmppServer server;
+    private final String roomId;
+    private final String gameId;
     private final KixmppJid roomJid;
+
+
     private ConcurrentHashMap<String, Channel> users = new ConcurrentHashMap<>();
     private ConcurrentHashMap<Channel, String> channelToNickname = new ConcurrentHashMap<>();
 
     /**
-     * @param roomJid
+     *
+     * @param server
+     * @param name
+     * @param serviceDomain
      */
-    public MucRoom(KixmppJid roomJid) {
+    public MucRoom(KixmppServer server, KixmppJid roomJid) {
+        this.server = server;
         this.roomJid = roomJid;
+        this.gameId = roomJid.getDomain().split(Pattern.quote("."))[0];
+        this.roomId = roomJid.getNode();
     }
 
     /**
@@ -112,18 +126,6 @@ public class MucRoom {
         }
     }
 
-    public void broadcast(String... messages) {
-        for (Channel channel : users.values()) {
-            for (String message : messages) {
-                Element stanza = createMessage(UUID.randomUUID().toString(),
-                        roomJid,
-                        channel.attr(BindKixmppServerModule.JID).get(),
-                        "groupchat",
-                        message);
-                channel.writeAndFlush(stanza);
-            }
-        }
-    }
 
     private Element createMessage(String id, KixmppJid from, KixmppJid to, String type, String bodyText) {
         Element message = new Element("message", Namespace.getNamespace("http://jabber.org/protocol/muc"));
@@ -142,6 +144,20 @@ public class MucRoom {
     }
 
 
+    public void broadcast(String... messages) {
+        for (Channel channel : users.values()) {
+            for (String message : messages) {
+                Element stanza = createMessage(UUID.randomUUID().toString(),
+                        roomJid,
+                        channel.attr(BindKixmppServerModule.JID).get(),
+                        "groupchat",
+                        message);
+                channel.writeAndFlush(stanza);
+            }
+        }
+    }
+
+
     /**
      * Broadcasts a message.
      *
@@ -149,22 +165,34 @@ public class MucRoom {
      * @param stanza
      */
     public void broadcast(Channel channel, Element stanza) {
-        if (channelToNickname.containsKey(channel)) {
-            Element body = new Element("body");
-            body.setText(stanza.getChildText("body", Namespace.getNamespace("jabber:client")));
-
-            for (Channel userChannel : channelToNickname.keySet()) {
-                Element message = new Element("message");
-                message.setAttribute("id", UUID.randomUUID().toString());
-                message.setAttribute("from", roomJid.withResource(channelToNickname.get(channel)).toString());
-                message.setAttribute("to", userChannel.attr(BindKixmppServerModule.JID).get().toString());
-                message.setAttribute("type", "groupchat");
-                message.addContent(body.clone());
-
-                userChannel.writeAndFlush(message);
-            }
+        String nickname = channelToNickname.get(channel);
+        if (nickname != null) {
+            broadcast(nickname,stanza);
+            server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, nickname, stanza), false);
         }
     }
+
+
+    /**
+     * Broadcasts a message using supplied nickname.
+     *
+     * @param nickname
+     * @param stanza
+     */
+    public void broadcast(String nickname, Element stanza) {
+        Element body = new Element("body");
+        body.setText(stanza.getChildText("body", Namespace.getNamespace("jabber:client")));
+        for (Channel userChannel : channelToNickname.keySet()) {
+            Element message = new Element("message");
+            message.setAttribute("id", UUID.randomUUID().toString());
+            message.setAttribute("from", roomJid.withResource(nickname).toString());
+            message.setAttribute("to", userChannel.attr(BindKixmppServerModule.JID).get().toString());
+            message.setAttribute("type", "groupchat");
+            message.addContent(body.clone());
+            userChannel.writeAndFlush(message);
+        }
+    }
+
 
     /**
      * Sends an invitation for a user.

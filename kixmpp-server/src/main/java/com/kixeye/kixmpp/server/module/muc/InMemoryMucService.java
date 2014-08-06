@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.kixeye.kixmpp.KixmppJid;
+import com.kixeye.kixmpp.server.KixmppServer;
 
 /**
  * A {@link MucService} that persists rooms in memory.
@@ -33,15 +34,17 @@ import com.kixeye.kixmpp.KixmppJid;
  */
 public class InMemoryMucService implements MucService {
 	private ConcurrentHashMap<String, MucRoom> rooms = new ConcurrentHashMap<>();
-	
+
+    private final KixmppServer server;
 	private final String serviceDomain;
+
 	
 	/**
 	 * @param serviceDomain
 	 */
-	public InMemoryMucService(String serviceDomain) {
+	public InMemoryMucService(KixmppServer server, String serviceDomain) {
 		serviceDomain = serviceDomain.toLowerCase();
-		
+		this.server = server;
 		this.serviceDomain = serviceDomain;
 	}
 
@@ -66,7 +69,7 @@ public class InMemoryMucService implements MucService {
 		MucRoom mucRoom = rooms.get(name);
 		
 		if (mucRoom == null) {
-			mucRoom = new MucRoom(new KixmppJid(name, serviceDomain));
+			mucRoom = new MucRoom(server, new KixmppJid(name,serviceDomain));
 			
 			MucRoom prevRoom = rooms.putIfAbsent(name, mucRoom);
 			

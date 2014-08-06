@@ -1,5 +1,15 @@
 package com.kixeye.kixmpp.server;
 
+import com.kixeye.kixmpp.p2p.ClusterClient;
+import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
+import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
+import com.kixeye.kixmpp.p2p.listener.ClusterListener;
+import com.kixeye.kixmpp.p2p.node.NodeId;
+import com.kixeye.kixmpp.server.cluster.task.ClusterTask;
+import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
+import com.kixeye.kixmpp.server.cluster.task.RoomTask;
+import com.kixeye.kixmpp.server.module.muc.MucRoom;
+import com.kixeye.kixmpp.server.module.muc.MucService;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
@@ -21,6 +31,8 @@ import java.util.Collections;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jdom2.Element;
@@ -69,10 +81,11 @@ import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
  * 
  * @author ebahtijaragic
  */
-public class KixmppServer implements AutoCloseable {
+public class KixmppServer implements AutoCloseable, ClusterListener {
 	private static final Logger logger = LoggerFactory.getLogger(KixmppServer.class);
 	
 	public static final InetSocketAddress DEFAULT_SOCKET_ADDRESS = new InetSocketAddress(5222);
+    public static final InetSocketAddress DEFAULT_CLUSTER_ADDRESS = new InetSocketAddress(8100);
 	
 	private final InetSocketAddress bindAddress;
 	private final String domain;
@@ -89,21 +102,25 @@ public class KixmppServer implements AutoCloseable {
 	private final AtomicReference<ChannelFuture> channelFuture = new AtomicReference<>();
 	private final AtomicReference<Channel> channel = new AtomicReference<>();
 	private AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
-	private static enum State {
+
+    private static enum State {
 		STARTING,
 		STARTED,
 		
 		STOPPING,
 		STOPPED
 	}
-	
-	/**
+
+    private final ClusterClient cluster;
+    private final ScheduledExecutorService scheduledExecutorService;
+
+    /**
 	 * Creates a new {@link KixmppServer} with the given ssl engine.
 	 * 
 	 * @param domain
 	 */
 	public KixmppServer(String domain) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), DEFAULT_SOCKET_ADDRESS, domain);
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), DEFAULT_SOCKET_ADDRESS, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery() );
 	}
 	
 	/**
@@ -112,8 +129,8 @@ public class KixmppServer implements AutoCloseable {
 	 * @param bindAddress
 	 * @param domain
 	 */
-	public KixmppServer(InetSocketAddress bindAddress, String domain) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), bindAddress, domain);
+	public KixmppServer(InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery) {
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), bindAddress, domain, clusterAddress, clusterDiscovery );
 	}
 	
 	/**
@@ -125,7 +142,7 @@ public class KixmppServer implements AutoCloseable {
 	 * @param domain
 	 * @param sslContext
 	 */
-	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, KixmppEventEngine eventEngine, InetSocketAddress bindAddress, String domain) {
+	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, KixmppEventEngine eventEngine, InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery) {
 		bootstrap = new ServerBootstrap()
 			.group(bossGroup, workerGroup)
 			.channel(NioServerSocketChannel.class)
@@ -135,6 +152,10 @@ public class KixmppServer implements AutoCloseable {
 					ch.pipeline().addLast(new KixmppServerMessageHandler());
 				}
 			});
+
+        scheduledExecutorService = Executors.newScheduledThreadPool( Runtime.getRuntime().availableProcessors() );
+        cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 10000, scheduledExecutorService );
+        cluster.getMessageRegistry().addCustomMessage(1, RoomBroadcastTask.class);
 
 		this.bindAddress = bindAddress;
 		this.domain = domain.toLowerCase();
@@ -201,6 +222,10 @@ public class KixmppServer implements AutoCloseable {
 		checkAndSetState(State.STOPPING, State.STARTED, State.STARTING);
 
 		logger.info("Stopping Kixmpp Server...");
+
+        // shutdown clustering
+        cluster.shutdown();
+        scheduledExecutorService.shutdown();
 		
 		for (Entry<String, KixmppServerModule> entry : modules.entrySet()) {
 			entry.getValue().uninstall(this);
@@ -479,4 +504,43 @@ public class KixmppServer implements AutoCloseable {
 			ctx.close();
 		}
 	}
+
+    public ClusterClient getCluster() {
+        return cluster;
+    }
+
+    @Override
+    public void onNodeJoin(ClusterClient cluster, NodeId nodeId) {
+        logger.info("Node {} joined cluster", nodeId.toString());
+    }
+
+    @Override
+    public void onNodeLeft(ClusterClient cluster, NodeId nodeId) {
+        logger.info("Node {} left cluster", nodeId.toString());
+    }
+
+    @Override
+    public void onMessage(ClusterClient cluster, NodeId senderId, Object message) {
+
+        if (message instanceof ClusterTask) {
+            // inject server reference
+            ((ClusterTask) message).setKixmppServer(this);
+        }
+
+        if (message instanceof RoomTask) {
+            // if room exists, queue task for execution
+            RoomTask roomTask = (RoomTask) message;
+            MucKixmppServerModule mucModule = module(MucKixmppServerModule.class);
+            MucService service = mucModule.getService(roomTask.getGameId());
+            if (service == null) {
+                return;
+            }
+            MucRoom room = service.getRoom(roomTask.getRoomId());
+            if (room == null) {
+                return;
+            }
+            roomTask.setRoom(room);
+            getEventEngine().publishTask(room.getRoomJid(),roomTask);
+        }
+    }
 }
