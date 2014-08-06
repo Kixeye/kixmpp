@@ -70,7 +70,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	 * @return
 	 */
 	public MucService addService(String name) {
-		return addService(name.toLowerCase(), new InMemoryMucService(name + "." + server.getDomain()));
+		return addService(name.toLowerCase(), new InMemoryMucService(server, name + "." + server.getDomain()));
 	}
 
 	/**

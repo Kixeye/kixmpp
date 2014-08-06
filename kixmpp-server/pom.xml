@@ -41,6 +41,11 @@
 			<artifactId>kixmpp-core</artifactId>
 			<version>${parent.version}</version>
 		</dependency>
+        <dependency>
+            <groupId>${parent.groupId}</groupId>
+            <artifactId>kixmpp-p2p</artifactId>
+            <version>${parent.version}</version>
+        </dependency>
 
 		<!-- Netty -->
 		<dependency>
@@ -56,11 +61,6 @@
 		<dependency>
 			<groupId>io.netty</groupId>
 			<artifactId>netty-buffer</artifactId>
-			<version>${netty.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.netty</groupId>
-			<artifactId>netty-common</artifactId>
 			<version>${netty.version}</version>
 		</dependency>
 		<dependency>

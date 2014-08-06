@@ -36,7 +36,7 @@ public interface MucService {
     public List<MucRoom> getRooms();
 
     /**
-     * Broadcast the given messages to all {@link MucRoom}.
+     * Broadcast the given messages to all rooms {@link MucRoom}.
      * @param messages
      */
     public void broadcast(String...messages);

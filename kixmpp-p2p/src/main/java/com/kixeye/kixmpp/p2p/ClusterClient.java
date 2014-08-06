@@ -43,7 +43,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * NodeRepository maintains a list of Zaqar peer-to-peer connections.
+ * ClusterClient maintains a list of Zaqar peer-to-peer connections.
  */
 public class ClusterClient {
     private final static Logger logger = LoggerFactory.getLogger(ClusterClient.class);
