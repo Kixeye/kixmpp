@@ -24,7 +24,6 @@ import io.netty.channel.Channel;
 
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 import org.jdom2.Element;
 import org.jdom2.Namespace;
@@ -113,7 +112,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 			if (x != null) {
 				KixmppJid fullRoomJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
 				
-				MucService service = services.get(fullRoomJid.getDomain().split(Pattern.quote("."))[0]);
+				MucService service = services.get(fullRoomJid.getDomain().replace("." + server.getDomain(), ""));
 				
 				if (service != null) {
 					MucRoom room = service.getRoom(fullRoomJid.getNode());
@@ -134,7 +133,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 			if ("groupchat".equals(stanza.getAttributeValue("type"))) {
 				KixmppJid fullRoomJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
 
-				MucService service = services.get(fullRoomJid.getDomain().split(Pattern.quote("."))[0]);
+				MucService service = services.get(fullRoomJid.getDomain().replace("." + server.getDomain(), ""));
 				
 				if (service != null) {
 					MucRoom room = service.getRoom(fullRoomJid.getNode());

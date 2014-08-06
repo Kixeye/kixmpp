@@ -47,6 +47,7 @@ public class MucRoom {
     private final String roomId;
     private ConcurrentHashMap<String, Participant> participantsByNickname = new ConcurrentHashMap<>();
     private ConcurrentHashMap<Channel, Participant> participantsByChannel = new ConcurrentHashMap<>();
+    private String subject;
 
     /**
      * @param roomJid
@@ -69,6 +70,20 @@ public class MucRoom {
     }
 
     /**
+	 * @return the subject
+	 */
+	public String getSubject() {
+		return subject;
+	}
+
+	/**
+	 * @param subject the subject to set
+	 */
+	public void setSubject(String subject) {
+		this.subject = subject;
+	}
+
+	/**
      * A user requests to join the room.
      *
      * @param channel
@@ -96,15 +111,17 @@ public class MucRoom {
 
                 channel.writeAndFlush(presence);
 
-                Element message = new Element("message");
-                message.setAttribute("id", UUID.randomUUID().toString());
-                message.setAttribute("from", roomJid.withResource(nickname).toString());
-                message.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
-                message.setAttribute("type", "groupchat");
-
-                message.addContent(new Element("subject"));
-
-                channel.writeAndFlush(message);
+                if (subject != null) {
+	                Element message = new Element("message");
+	                message.setAttribute("id", UUID.randomUUID().toString());
+	                message.setAttribute("from", roomJid.withResource(nickname).toString());
+	                message.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
+	                message.setAttribute("type", "groupchat");
+	
+	                message.addContent(new Element("subject").setText(subject));
+	
+	                channel.writeAndFlush(message);
+                }
 
                 channel.closeFuture().addListener(new CloseChannelListener(channel));
             } // TODO handle else
