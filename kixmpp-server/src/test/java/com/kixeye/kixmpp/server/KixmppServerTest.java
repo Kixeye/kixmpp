@@ -20,7 +20,6 @@ package com.kixeye.kixmpp.server;
  * #L%
  */
 
-
 import io.netty.handler.ssl.SslContext;
 
 import java.util.concurrent.LinkedBlockingQueue;
@@ -57,50 +56,120 @@ import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
  */
 public class KixmppServerTest {
 	@Test
-	public void testSimpleUsingKixmpp() throws Exception {
+	public void testUserMapping() throws Exception {
 		try (KixmppServer server = new KixmppServer("testChat")) {
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
-			
-			((InMemoryAuthenticationService)server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
+
+			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
 			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
-			
-			try (KixmppClient client = new KixmppClient(SslContext.newClientContext())) {
+
+			try (KixmppClient client = new KixmppClient(
+					SslContext.newClientContext())) {
 				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();
 				final LinkedBlockingQueue<MucJoin> mucJoins = new LinkedBlockingQueue<>();
 				final LinkedBlockingQueue<MucMessage> mucMessages = new LinkedBlockingQueue<>();
 
-				Assert.assertNotNull(client.connect("localhost", server.getBindAddress().getPort(), server.getDomain()).get(2, TimeUnit.SECONDS));
+				Assert.assertNotNull(client.connect("localhost",server.getBindAddress().getPort(), server.getDomain())
+						.get(2, TimeUnit.SECONDS));
 
-				client.module(PresenceKixmppClientModule.class).addPresenceListener(new PresenceListener() {
-					public void handle(Presence presence) {
-						presences.offer(presence);
-					}
-				});
-				
-				client.module(MucKixmppClientModule.class).addJoinListener(new MucListener<MucJoin>() {
-					public void handle(MucJoin event) {
-						mucJoins.offer(event);
-					}
-				});
-				
-				client.module(MucKixmppClientModule.class).addMessageListener(new MucListener<MucMessage>() {
-					public void handle(MucMessage event) {
-						mucMessages.offer(event);
-					}
-				});
-				
+				client.module(PresenceKixmppClientModule.class)
+						.addPresenceListener(new PresenceListener() {
+							public void handle(Presence presence) {
+								presences.offer(presence);
+							}
+						});
+
+				client.module(MucKixmppClientModule.class).addJoinListener(
+						new MucListener<MucJoin>() {
+							public void handle(MucJoin event) {
+								mucJoins.offer(event);
+							}
+						});
+
+				client.module(MucKixmppClientModule.class).addMessageListener(
+						new MucListener<MucMessage>() {
+							public void handle(MucMessage event) {
+								mucMessages.offer(event);
+							}
+						});
+
 				Assert.assertNotNull(client.login("testUser", "testPassword", "testResource").get(2, TimeUnit.SECONDS));
 				client.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
-				
+
+				Assert.assertNotNull(server.getChannel(KixmppJid.fromRawJid("testUser@testchat/testResource")));
+			}
+
+			int count = 0;
+			
+			while (count < 50 && server.getChannel(KixmppJid.fromRawJid("testUser@testchat/testResource")) != null) {
+				count++;
+				System.gc();
+				Thread.sleep(100);
+			}
+
+			Assert.assertNull(server.getChannel(KixmppJid.fromRawJid("testUser@testchat/testResource")));
+		}
+	}
+
+	@Test
+	public void testSimpleUsingKixmpp() throws Exception {
+		try (KixmppServer server = new KixmppServer("testChat")) {
+			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
+
+			((InMemoryAuthenticationService) server.module(
+					SaslKixmppServerModule.class).getAuthenticationService())
+					.addUser("testUser", "testPassword");
+			server.module(MucKixmppServerModule.class).addService("conference")
+					.addRoom("someRoom");
+
+			try (KixmppClient client = new KixmppClient(
+					SslContext.newClientContext())) {
+				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();
+				final LinkedBlockingQueue<MucJoin> mucJoins = new LinkedBlockingQueue<>();
+				final LinkedBlockingQueue<MucMessage> mucMessages = new LinkedBlockingQueue<>();
+
+				Assert.assertNotNull(client.connect("localhost",
+						server.getBindAddress().getPort(), server.getDomain())
+						.get(2, TimeUnit.SECONDS));
+
+				client.module(PresenceKixmppClientModule.class)
+						.addPresenceListener(new PresenceListener() {
+							public void handle(Presence presence) {
+								presences.offer(presence);
+							}
+						});
+
+				client.module(MucKixmppClientModule.class).addJoinListener(
+						new MucListener<MucJoin>() {
+							public void handle(MucJoin event) {
+								mucJoins.offer(event);
+							}
+						});
+
+				client.module(MucKixmppClientModule.class).addMessageListener(
+						new MucListener<MucMessage>() {
+							public void handle(MucMessage event) {
+								mucMessages.offer(event);
+							}
+						});
+
+				Assert.assertNotNull(client.login("testUser", "testPassword",
+						"testResource").get(2, TimeUnit.SECONDS));
+				client.module(PresenceKixmppClientModule.class).updatePresence(
+						new Presence());
+
 				Assert.assertNotNull(presences.poll(2, TimeUnit.SECONDS));
-				
-				client.module(MucKixmppClientModule.class).joinRoom(KixmppJid.fromRawJid("someRoom@conference.testChat"), "testNick");
-				
+
+				client.module(MucKixmppClientModule.class).joinRoom(
+						KixmppJid.fromRawJid("someRoom@conference.testChat"),
+						"testNick");
+
 				MucJoin mucJoin = mucJoins.poll(2, TimeUnit.SECONDS);
-				
+
 				Assert.assertNotNull(mucJoin);
-				
-				client.module(MucKixmppClientModule.class).sendRoomMessage(mucJoin.getRoomJid(), "someMessage", "testNick");
+
+				client.module(MucKixmppClientModule.class).sendRoomMessage(
+						mucJoin.getRoomJid(), "someMessage", "testNick");
 
 				MucMessage mucMessage = mucMessages.poll(2, TimeUnit.SECONDS);
 
@@ -109,45 +178,53 @@ public class KixmppServerTest {
 			}
 		}
 	}
-	
+
 	@Test
 	public void testSimpleUsingSmack() throws Exception {
 		try (KixmppServer server = new KixmppServer("testChat")) {
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
-			
-			((InMemoryAuthenticationService)server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
-			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
-			
-			XMPPConnection connection = new XMPPTCPConnection(new ConnectionConfiguration("localhost", server.getBindAddress().getPort(), server.getDomain()));
-				
+
+			((InMemoryAuthenticationService) server.module(
+					SaslKixmppServerModule.class).getAuthenticationService())
+					.addUser("testUser", "testPassword");
+			server.module(MucKixmppServerModule.class).addService("conference")
+					.addRoom("someRoom");
+
+			XMPPConnection connection = new XMPPTCPConnection(
+					new ConnectionConfiguration("localhost", server
+							.getBindAddress().getPort(), server.getDomain()));
+
 			try {
 				connection.connect();
-				
+
 				connection.login("testUser", "testPassword");
-				
+
 				final LinkedBlockingQueue<Message> messages = new LinkedBlockingQueue<>();
-				
+
 				PacketListener messageListener = new PacketListener() {
-					public void processPacket(Packet packet) throws NotConnectedException {
-						messages.offer((Message)packet);
+					public void processPacket(Packet packet)
+							throws NotConnectedException {
+						messages.offer((Message) packet);
 					}
 				};
-				
-				MultiUserChat chat = new MultiUserChat(connection, "someRoom@conference.testChat");
+
+				MultiUserChat chat = new MultiUserChat(connection,
+						"someRoom@conference.testChat");
 				chat.addMessageListener(messageListener);
 				chat.join("testNick");
-				
+
 				chat.sendMessage("hello!");
-				
+
 				Message message = messages.poll(2, TimeUnit.SECONDS);
-				
+
 				Assert.assertNotNull(message);
 
-				if (null == message.getBody() || "".equals(message.getBody().trim())) {
+				if (null == message.getBody()
+						|| "".equals(message.getBody().trim())) {
 					message = messages.poll(2, TimeUnit.SECONDS);
-	
+
 					Assert.assertNotNull(message);
-					
+
 					Assert.assertEquals("hello!", message.getBody());
 				}
 			} finally {
