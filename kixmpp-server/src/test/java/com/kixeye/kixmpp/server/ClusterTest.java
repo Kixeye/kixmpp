@@ -61,6 +61,10 @@ public class ClusterTest {
 
     @Test
     public void twoNodeCluster() throws Exception {
+
+        // turn on Netty's leak detector
+        System.setProperty("io.netty.leakDetectionLevel","PARANOID");
+
         // start servers
         KixmppServer serverA = new KixmppServer(SERVER_A_SOCKET, "testChat", SERVER_A_CLUSTER, discovery);
         KixmppServer serverB = new KixmppServer(SERVER_B_SOCKET, "testChat", SERVER_B_CLUSTER, discovery);
@@ -80,6 +84,7 @@ public class ClusterTest {
         // send message to room
         clientA.sendRoomMessage();
 
+        // verity both clients got the message
         clientA.verifyRoomMessage();
         clientB.verifyRoomMessage();
 
@@ -175,8 +180,8 @@ public class ClusterTest {
                Assert.assertNotNull(message);
            }
 
-           public void disconnect() {
-               client.disconnect();
+           public void disconnect() throws ExecutionException, InterruptedException {
+               client.disconnect().get();
            }
 
          }
