@@ -140,8 +140,8 @@ public class MucKixmppServerModule implements KixmppServerModule {
 					MucRoom room = service.getRoom(fullRoomJid.getNode());
 
 					if (room != null) {
-                        String message = stanza.getChildText("body");
-                        room.receiveMessages(channel.attr(BindKixmppServerModule.JID).get(),message);
+                        Element body = stanza.getChild("body", stanza.getNamespace());
+                        room.receiveMessages(channel.attr(BindKixmppServerModule.JID).get(), body.getText());
 					} // TODO handle else
 				} // TODO handle else
 			}

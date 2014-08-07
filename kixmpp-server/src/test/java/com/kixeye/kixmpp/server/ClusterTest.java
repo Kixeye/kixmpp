@@ -167,7 +167,7 @@ public class ClusterTest {
 
                // join room
                client.module(MucKixmppClientModule.class).joinRoom(KixmppJid.fromRawJid("someRoom@conference.testChat"), username);
-               mucJoin = mucJoins.poll(2,TimeUnit.SECONDS);
+               mucJoin = mucJoins.poll(5,TimeUnit.SECONDS);
                Assert.assertNotNull(mucJoin);
            }
 
@@ -176,7 +176,7 @@ public class ClusterTest {
            }
 
            public void verifyRoomMessage() throws InterruptedException {
-               MucMessage message = mucMessages.poll(2, TimeUnit.SECONDS);
+               MucMessage message = mucMessages.poll(5, TimeUnit.SECONDS);
                Assert.assertNotNull(message);
            }
 

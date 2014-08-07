@@ -92,6 +92,7 @@ public class MucRoom {
 
         checkForMemberOnly(jid);
         checkForNicknameInUse(nickname, jid);
+        memberNicknamesByBareJid.put(jid.withoutResource(),nickname);
 
         User user = usersByNickname.get(nickname);
         if (user == null) {
@@ -116,15 +117,17 @@ public class MucRoom {
 
         channel.writeAndFlush(presence);
 
-        Element message = new Element("message");
-        message.setAttribute("id", UUID.randomUUID().toString());
-        message.setAttribute("from", roomJid.withResource(nickname).toString());
-        message.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
-        message.setAttribute("type", "groupchat");
+        if (settings.getSubject() != null) {
+            Element message = new Element("message");
+            message.setAttribute("id", UUID.randomUUID().toString());
+            message.setAttribute("from", roomJid.withResource(nickname).toString());
+            message.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
+            message.setAttribute("type", "groupchat");
 
-        message.addContent(new Element("subject"));
+            message.addContent(new Element("subject").setText(settings.getSubject()));
 
-        channel.writeAndFlush(message);
+            channel.writeAndFlush(message);
+        }
 
         channel.closeFuture().addListener(new CloseChannelListener(client));
     }
@@ -157,14 +160,14 @@ public class MucRoom {
     }
 
     private Element createMessage(String id, KixmppJid from, KixmppJid to, String type, String bodyText) {
-        Element message = new Element("message", Namespace.getNamespace("http://jabber.org/protocol/muc"));
+        Element message = new Element("message");
 
         message.setAttribute("to", to.getFullJid());
         message.setAttribute("from", from.getFullJid());
         message.setAttribute("type", type);
         message.setAttribute("id", id);
 
-        Element body = new Element("body", Namespace.getNamespace("http://jabber.org/protocol/muc"));
+        Element body = new Element("body");
         body.addContent(bodyText);
 
         message.addContent(body);
@@ -172,16 +175,6 @@ public class MucRoom {
         return message;
     }
 
-
-    /**
-     * Broadcasts a message.
-     *
-     * @param fromAddress
-     * @param messages
-     */
-    public void receiveMessages(KixmppJid fromAddress, String... messages) {
-        receiveMessages(fromAddress, messages, true);
-    }
 
     /**
      * Broadcasts a message.
@@ -198,16 +191,23 @@ public class MucRoom {
      * @param fromAddress
      * @param messages
      */
-    public void receiveMessages(KixmppJid fromAddress, String[] messages, boolean cluster) {
+    public void receiveMessages(KixmppJid fromAddress, String[] messages) {
         if (fromAddress == null) {
             return;
         }
+        String fromNickname = memberNicknamesByBareJid.get(fromAddress.withoutResource());
         //TODO validate fromAddress is roomJid or is a member of the room
-        for (User user : usersByNickname.values()) {
-            user.receiveMessages(fromAddress, messages);
+        KixmppJid fromRoomJid = roomJid.withoutResource().withResource(fromNickname);
+
+        for (User to : usersByNickname.values()) {
+            to.receiveMessages(fromRoomJid, messages);
         }
-        if (cluster) {
-            server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, fromAddress, messages), false);
+        server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, fromRoomJid, messages), false);
+    }
+
+    public void receive(KixmppJid fromAddress, String...messages){
+        for (User to : usersByNickname.values()) {
+            to.receiveMessages(fromAddress, messages);
         }
     }
 
@@ -289,11 +289,11 @@ public class MucRoom {
             return client;
         }
 
-        public Client getConnection(Channel channel) {
+        public Client getClient(Channel channel) {
             return clientsByChannel.get(channel);
         }
 
-        public Client getConnection(KixmppJid address) {
+        public Client getClient(KixmppJid address) {
             return clientsByAddress.get(address);
         }
 
