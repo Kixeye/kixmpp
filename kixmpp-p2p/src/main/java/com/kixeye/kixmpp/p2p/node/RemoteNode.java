@@ -73,7 +73,7 @@ public class RemoteNode extends Node {
     @Override
     public void sendMessage(MessageWrapper wrapper) {
         if (channel != null) {
-            channel.writeAndFlush(wrapper.getSerialized(cluster.getMessageRegistry()));
+            channel.writeAndFlush(wrapper.getMessage());
         }
     }
 

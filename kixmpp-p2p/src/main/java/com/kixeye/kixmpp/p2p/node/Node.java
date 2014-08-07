@@ -35,11 +35,12 @@ public abstract class Node {
         CONNECTING,
         CONNECTED,
         CLOSED
-    };
+    }
 
     protected NodeId id;
     protected ClusterClient cluster;
     protected State state;
+    protected boolean orphaned;
 
     /**
      * Constructor for Node created from an incoming connection.
@@ -96,6 +97,13 @@ public abstract class Node {
 
 
     /**
+     * orphaned
+     */
+    public void setOrphaned(boolean value) {
+        this.orphaned = value;
+    }
+
+    /**
      * Send a message to the owner of this node.
      * @param msg
      */
@@ -108,7 +116,9 @@ public abstract class Node {
     public void close() {
         state = State.CLOSED;
         if (cluster != null) {
-            cluster.removeNode(this);
+            if (!orphaned) {
+                cluster.removeNode(this);
+            }
             cluster = null;
         }
     }
