@@ -45,13 +45,13 @@ public class ProtostuffEncoder extends MessageToMessageEncoder<Object> {
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
         if (msg instanceof ByteBuf) {
-            // assume already serialized so just pass through
+            // already serialized so just pass through
             ByteBuf buf = (ByteBuf) msg;
-            out.add(buf);
+            out.add(buf.retain());
         } else {
             // serialize
             ByteBuf buf = ctx.alloc().buffer();
-            serializeToByteBuf(registry,buf, msg);
+            serializeToByteBuf(registry, buf, msg);
             out.add(buf);
         }
     }
