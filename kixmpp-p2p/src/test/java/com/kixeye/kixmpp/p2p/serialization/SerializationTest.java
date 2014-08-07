@@ -22,8 +22,6 @@ package com.kixeye.kixmpp.p2p.serialization;
 
 import com.kixeye.kixmpp.p2p.message.MessageRegistry;
 import com.kixeye.kixmpp.p2p.node.NodeId;
-import com.kixeye.kixmpp.p2p.serialization.ProtostuffDecoder;
-import com.kixeye.kixmpp.p2p.serialization.ProtostuffEncoder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.Assert;

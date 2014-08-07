@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * ClusterClient maintains a list of Zaqar peer-to-peer connections.
@@ -53,11 +54,14 @@ public class ClusterClient {
     private final MessageRegistry messageRegistry = new MessageRegistry();
     private final ScheduledExecutorService executorService;
     private final ScheduledFuture<?> pollingTask;
-    private final Map<NodeId,Node> idToNode = new ConcurrentHashMap<>();
-    private final Map<NodeAddress,Node> addrToNode = new ConcurrentHashMap<>();
     private final NioEventLoopGroup bossGroup;
     private final NioEventLoopGroup workerGroup;
     private final Object joinLock = new Object();
+
+    // node maps
+    private final Map<NodeId,Node> idToNode = new ConcurrentHashMap<>();
+    private final Map<NodeAddress,Node> addrToNode = new ConcurrentHashMap<>();
+    private final AtomicInteger nodeCount = new AtomicInteger(0);
 
     private NodeDiscovery discovery;
     private ClusterListener listener;
@@ -89,7 +93,7 @@ public class ClusterClient {
             public void run() {
                 pollForNodes();
             }
-        }, 0, msPollingTime, TimeUnit.MILLISECONDS);
+        }, 15, msPollingTime, TimeUnit.MILLISECONDS);
     }
 
 
@@ -110,7 +114,9 @@ public class ClusterClient {
     public void sendMessage(NodeId destinationNodeId, Object msg) {
         Node node = idToNode.get(destinationNodeId);
         if (node != null) {
-            node.sendMessage(MessageWrapper.wrap(msg));
+            MessageWrapper wrapper = MessageWrapper.wrap(msg);
+            node.sendMessage(wrapper);
+            wrapper.release();
         }
     }
 
@@ -124,9 +130,10 @@ public class ClusterClient {
         for (NodeId nid : destinationNodeIds) {
             Node node = idToNode.get(nid);
             if (node != null) {
-                node.sendMessage( wrapper );
+                node.sendMessage(wrapper);
             }
         }
+        wrapper.release();
     }
 
 
@@ -142,6 +149,7 @@ public class ClusterClient {
             }
             node.sendMessage(wrapper);
         }
+        wrapper.release();
     }
 
 
@@ -159,7 +167,7 @@ public class ClusterClient {
      * @return
      */
     public int getNodeCount() {
-        return idToNode.size();
+        return nodeCount.get();
     }
 
 
@@ -226,6 +234,7 @@ public class ClusterClient {
             }
         }
         if (existingNode == null && node.getId() != null) {
+            nodeCount.incrementAndGet();
             executorService.execute(
                     new Runnable() {
                         @Override
@@ -252,6 +261,7 @@ public class ClusterClient {
             }
         }
         if (existingNode != null) {
+            nodeCount.decrementAndGet();
             executorService.execute(
                     new Runnable() {
                         @Override
@@ -268,6 +278,7 @@ public class ClusterClient {
      */
     @ChannelHandler.Sharable
     private class ServerChannelHandler extends ChannelInboundHandlerAdapter {
+
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
         }
@@ -308,6 +319,7 @@ public class ClusterClient {
                             return;
                         } else {
                             // our node is still initializing but our Id is higher so kill ours and allow this through
+                            existingNode.setOrphaned(true);
                             idToNode.remove(joinRequest.getJoinerId());
                             addrToNode.remove(joinRequest.getJoinerAddress());
                         }

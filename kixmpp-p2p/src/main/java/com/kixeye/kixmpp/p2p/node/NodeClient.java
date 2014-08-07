@@ -53,6 +53,8 @@ public class NodeClient {
             protected void initChannel(SocketChannel ch) throws Exception {
                 ChannelPipeline p = ch.pipeline();
 
+                //p.addLast(new LoggingHandler());
+
                 // encoders
                 p.addLast(new LengthFieldPrepender(4));
                 p.addLast(new ProtostuffEncoder(messageRegistry));

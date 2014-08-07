@@ -25,6 +25,7 @@ import io.netty.util.AttributeKey;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
 import org.jdom2.Element;
 import org.jdom2.Namespace;
@@ -88,9 +89,15 @@ public class BindKixmppServerModule implements KixmppServerModule {
 				// handle the bind
 				String resource = bind.getChildText("resource", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
 				
-				if (resource != null) {
-					channel.attr(BindKixmppServerModule.JID).set(channel.attr(BindKixmppServerModule.JID).get().withResource(resource));
+				if (resource == null) {
+					resource = UUID.randomUUID().toString().replace("-", "");
 				}
+
+				KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get().withResource(resource);
+				
+				channel.attr(BindKixmppServerModule.JID).set(jid);
+				
+				server.addChannelMapping(jid, channel);
 				
 				Element iq = new Element("iq");
 				iq.setAttribute("type", "result");
@@ -102,7 +109,7 @@ public class BindKixmppServerModule implements KixmppServerModule {
 				}
 				
 				bind = new Element("bind", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
-				bind.addContent(new Element("jid", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind")).setText(channel.attr(BindKixmppServerModule.JID).get().toString()));
+				bind.addContent(new Element("jid", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind")).setText(jid.toString()));
 				
 				iq.addContent(bind);
 				
