@@ -92,12 +92,15 @@ public class MucRoom {
 
         checkForMemberOnly(jid);
         checkForNicknameInUse(nickname, jid);
-        memberNicknamesByBareJid.put(jid.withoutResource(),nickname);
+
+        addMember(jid, nickname);
 
         User user = usersByNickname.get(nickname);
+
         if (user == null) {
             user = new User(nickname, jid.withoutResource());
         }
+
         Client client = user.addClient(new Client(jid, nickname, channel));
 
         usersByNickname.put(nickname, user);
@@ -149,6 +152,29 @@ public class MucRoom {
     }
 
     /**
+     * Remove the {@link User} associated with the given {@link KixmppJid} from the
+     * room.  This will remove all {@link Client}s associated with the {@link User}.
+     *
+     * @param address
+     * @return
+     */
+    public boolean removeUser(KixmppJid address) {
+        String nickname = memberNicknamesByBareJid.get(address.withoutResource());
+        if (nickname == null) {
+            //user is not in the room
+            return false;
+        }
+        User user = usersByNickname.get(nickname);
+        if (user == null) {
+            //user is no longer connected to the room
+            return false;
+        }
+        user.removeClients();
+        removeDisconnectedUser(user);
+        return true;
+    }
+
+    /**
      * A user leaves the room.
      *
      * @param client
@@ -156,7 +182,7 @@ public class MucRoom {
     private void leave(Client client) {
         User user = usersByNickname.get(client.getNickname());
         user.removeClient(client);
-        removeUser(user);
+        removeDisconnectedUser(user);
     }
 
     private Element createMessage(String id, KixmppJid from, KixmppJid to, String type, String bodyText) {
@@ -191,7 +217,7 @@ public class MucRoom {
      * @param fromAddress
      * @param messages
      */
-    public void receiveMessages(KixmppJid fromAddress, String[] messages) {
+    public void receiveMessages(KixmppJid fromAddress, String... messages) {
         if (fromAddress == null) {
             return;
         }
@@ -205,7 +231,7 @@ public class MucRoom {
         server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, fromRoomJid, messages), false);
     }
 
-    public void receive(KixmppJid fromAddress, String...messages){
+    public void receive(KixmppJid fromAddress, String... messages) {
         for (User to : usersByNickname.values()) {
             to.receiveMessages(fromAddress, messages);
         }
@@ -232,7 +258,7 @@ public class MucRoom {
         userChannelToInvite.writeAndFlush(message);
     }
 
-    public Collection<User> getUsers(){
+    public Collection<User> getUsers() {
         return Lists.newArrayList(usersByNickname.values());
     }
 
@@ -259,7 +285,7 @@ public class MucRoom {
         }
     }
 
-    private void removeUser(User user) {
+    private void removeDisconnectedUser(User user) {
         if (user.getClientCount() == 0) {
             this.usersByNickname.remove(user.getNickname());
         }
@@ -329,6 +355,11 @@ public class MucRoom {
 
         public int getClientCount() {
             return clientsByAddress.size();
+        }
+
+        public void removeClients() {
+            clientsByAddress.clear();
+            clientsByChannel.clear();
         }
     }
 
