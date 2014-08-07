@@ -28,7 +28,9 @@ import com.kixeye.kixmpp.KixmppException;
  * @author dturner@kixeye.com
  */
 public class NicknameInUseException extends KixmppException {
-    public NicknameInUseException(MucRoom mucRoom, String nickname) {
+	private static final long serialVersionUID = -5399459625689179197L;
+
+	public NicknameInUseException(MucRoom mucRoom, String nickname) {
         super("Nickname " + nickname + " is already in use by another member in room " + mucRoom.getRoomJid());
     }
 }

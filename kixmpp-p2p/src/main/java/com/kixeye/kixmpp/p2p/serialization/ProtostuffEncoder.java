@@ -25,6 +25,7 @@ import com.dyuproject.protostuff.ProtostuffIOUtil;
 import com.dyuproject.protostuff.Schema;
 import com.dyuproject.protostuff.runtime.RuntimeSchema;
 import com.kixeye.kixmpp.p2p.message.MessageRegistry;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.channel.ChannelHandlerContext;
@@ -65,7 +66,8 @@ public class ProtostuffEncoder extends MessageToMessageEncoder<Object> {
      * @return
      * @throws IOException
      */
-    public static ByteBuf serializeToByteBuf(MessageRegistry registry, ByteBuf buf, Object msg) throws IOException {
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+	public static ByteBuf serializeToByteBuf(MessageRegistry registry, ByteBuf buf, Object msg) throws IOException {
         // write class id
         int classIdx = registry.getIdFromClass(msg.getClass());
         buf.writeInt(classIdx);

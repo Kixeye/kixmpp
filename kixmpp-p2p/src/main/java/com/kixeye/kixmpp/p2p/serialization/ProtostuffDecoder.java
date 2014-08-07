@@ -24,6 +24,7 @@ import com.dyuproject.protostuff.ProtostuffIOUtil;
 import com.dyuproject.protostuff.Schema;
 import com.dyuproject.protostuff.runtime.RuntimeSchema;
 import com.kixeye.kixmpp.p2p.message.MessageRegistry;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelHandlerContext;
@@ -56,7 +57,8 @@ public class ProtostuffDecoder extends MessageToMessageDecoder<ByteBuf>{
      * @return
      * @throws IOException
      */
-    public static Object deserializeFromByteBuf(MessageRegistry registry, ByteBuf buf) throws IOException {
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+	public static Object deserializeFromByteBuf(MessageRegistry registry, ByteBuf buf) throws IOException {
         // get message class
         int typeIdx = buf.readInt();
         Class<?> clazz = registry.getClassFromId(typeIdx);

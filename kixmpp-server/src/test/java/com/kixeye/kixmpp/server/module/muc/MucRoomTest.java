@@ -20,24 +20,26 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
-import com.kixeye.kixmpp.KixmppJid;
-import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.util.Attribute;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import com.kixeye.kixmpp.KixmppJid;
+import com.kixeye.kixmpp.server.KixmppServer;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
 /**
  * tests for {@link MucRoom}
  *
  * @author dturner@kixeye.com
  */
+@SuppressWarnings("unchecked")
 public class MucRoomTest {
-
-    @Test
+	@Test
     public void joinRoom_firstTime_noMemberOnly() {
         KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");

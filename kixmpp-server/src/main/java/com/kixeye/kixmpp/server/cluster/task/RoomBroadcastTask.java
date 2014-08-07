@@ -23,7 +23,6 @@ package com.kixeye.kixmpp.server.cluster.task;
 
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.module.muc.MucRoom;
-import org.jdom2.Element;
 
 public class RoomBroadcastTask extends RoomTask {
 

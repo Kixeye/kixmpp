@@ -21,13 +21,13 @@ package com.kixeye.kixmpp.p2p.util;
  */
 
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Net {
     private final static Logger logger = LoggerFactory.getLogger(Net.class);
@@ -45,7 +45,7 @@ public class Net {
             // Enumerate NICs looking for a reasonable IP
             String bestAddress = localhost;
             int bestScore = 0;
-            Enumeration e = NetworkInterface.getNetworkInterfaces();
+            Enumeration<NetworkInterface> e = NetworkInterface.getNetworkInterfaces();
             while(e.hasMoreElements())
             {
                 NetworkInterface n = (NetworkInterface) e.nextElement();
@@ -62,7 +62,7 @@ public class Net {
                 }
 
                 // get first IP associated with NIC
-                Enumeration ee = n.getInetAddresses();
+                Enumeration<InetAddress> ee = n.getInetAddresses();
                 while (ee.hasMoreElements())
                 {
                     int score = baseScore;

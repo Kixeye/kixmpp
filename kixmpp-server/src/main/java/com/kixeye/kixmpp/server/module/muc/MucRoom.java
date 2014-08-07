@@ -191,7 +191,7 @@ public class MucRoom {
      * @param fromAddress
      * @param messages
      */
-    public void receiveMessages(KixmppJid fromAddress, String[] messages) {
+    public void receiveMessages(KixmppJid fromAddress, String... messages) {
         if (fromAddress == null) {
             return;
         }
