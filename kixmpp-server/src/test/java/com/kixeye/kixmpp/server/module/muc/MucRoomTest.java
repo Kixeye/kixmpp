@@ -153,4 +153,75 @@ public class MucRoomTest {
 
         Assert.assertEquals(1, mucRoom.getClients().size());
     }
+
+    @Test
+    public void removeUser_userNotInRoom(){
+        KixmppServer server = Mockito.mock(KixmppServer.class);
+        KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
+        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(false));
+
+        Assert.assertFalse(mucRoom.removeUser(new KixmppJid("test.user","testdomain")));
+    }
+
+    @Test
+    public void removeUser_userInRoom(){
+        KixmppServer server = Mockito.mock(KixmppServer.class);
+        KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
+        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(false));
+
+        KixmppJid clientJid = new KixmppJid("test.user", "testdomain", "testresource");
+
+        Channel channel = Mockito.mock(Channel.class);
+        Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
+        Mockito.when(jidAttribute.get()).thenReturn(clientJid);
+        Mockito.when(channel.attr(BindKixmppServerModule.JID)).thenReturn(jidAttribute);
+        Mockito.when(channel.closeFuture()).thenReturn(Mockito.mock(ChannelFuture.class));
+
+        Assert.assertEquals(0, mucRoom.getUsers().size());
+
+        mucRoom.join(channel, "nickname");
+
+        Assert.assertEquals(1, mucRoom.getUsers().size());
+
+        Assert.assertTrue(mucRoom.removeUser(clientJid));
+
+        Assert.assertEquals(0, mucRoom.getUsers().size());
+    }
+
+    @Test
+    public void removeAndRejoinUser(){
+        KixmppServer server = Mockito.mock(KixmppServer.class);
+        KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
+        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(true));
+
+        KixmppJid clientJid = new KixmppJid("test.user", "testdomain", "testresource");
+
+        Channel channel = Mockito.mock(Channel.class);
+        Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
+        Mockito.when(jidAttribute.get()).thenReturn(clientJid);
+        Mockito.when(channel.attr(BindKixmppServerModule.JID)).thenReturn(jidAttribute);
+        Mockito.when(channel.closeFuture()).thenReturn(Mockito.mock(ChannelFuture.class));
+
+        Assert.assertEquals(0, mucRoom.getUsers().size());
+
+        try{
+            mucRoom.join(channel, "nickname");
+            Assert.fail();
+        } catch (MembersOnlyException e){
+            //expected
+        }
+
+        Assert.assertEquals(0, mucRoom.getUsers().size());
+
+        mucRoom.addMember(clientJid, "nickname");
+        mucRoom.join(channel, "nickname");
+
+        Assert.assertEquals(1, mucRoom.getUsers().size());
+        Assert.assertTrue(mucRoom.removeUser(clientJid));
+        Assert.assertEquals(0, mucRoom.getUsers().size());
+
+        mucRoom.join(channel, "nickname");
+
+        Assert.assertEquals(1, mucRoom.getUsers().size());
+    }
 }
