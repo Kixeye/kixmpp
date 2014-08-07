@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server.cluster.task;
+package com.kixeye.kixmpp.server.cluster.message;
 
 /*
  * #%L
@@ -20,26 +20,18 @@ package com.kixeye.kixmpp.server.cluster.task;
  * #L%
  */
 
+import com.kixeye.kixmpp.server.KixmppServer;
+import org.fusesource.hawtdispatch.Task;
 
-import com.kixeye.kixmpp.KixmppJid;
-import com.kixeye.kixmpp.server.module.muc.MucRoom;
+public abstract class ClusterTask extends Task {
 
-public class RoomBroadcastTask extends RoomTask {
+    private transient KixmppServer server;
 
-    private KixmppJid from;
-    private String[] messages;
-
-    public RoomBroadcastTask() {
+    public void setKixmppServer(KixmppServer server) {
+        this.server = server;
     }
 
-    public RoomBroadcastTask(MucRoom room, String gameId, String roomId, KixmppJid from, String...messages) {
-        super(room,gameId,roomId);
-        this.from = from;
-        this.messages = messages;
-    }
-
-    @Override
-    public void run() {
-        getRoom().receive(from, messages);
+    public KixmppServer getKixmppServer() {
+        return server;
     }
 }
