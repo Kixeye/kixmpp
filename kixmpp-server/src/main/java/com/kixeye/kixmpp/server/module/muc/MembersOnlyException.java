@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server.cluster.message;
+package com.kixeye.kixmpp.server.module.muc;
 
 /*
  * #%L
@@ -20,26 +20,18 @@ package com.kixeye.kixmpp.server.cluster.message;
  * #L%
  */
 
-
+import com.kixeye.kixmpp.KixmppException;
 import com.kixeye.kixmpp.KixmppJid;
-import com.kixeye.kixmpp.server.module.muc.MucRoom;
 
-public class RoomBroadcastTask extends RoomTask {
+/**
+ * A user attempted to join a members-only MUC room for which they are not a member.
+ *
+ * @author dturner@kixeye.com
+ */
+public class MembersOnlyException extends KixmppException {
+	private static final long serialVersionUID = 8605187410416156957L;
 
-    private KixmppJid from;
-    private String[] messages;
-
-    public RoomBroadcastTask() {
-    }
-
-    public RoomBroadcastTask(MucRoom room, String gameId, String roomId, KixmppJid from, String...messages) {
-        super(room,gameId,roomId);
-        this.from = from;
-        this.messages = messages;
-    }
-
-    @Override
-    public void run() {
-        getRoom().receive(from, messages);
+	public MembersOnlyException(MucRoom mucRoom, KixmppJid jid) {
+        super(jid + " cannot join room " + mucRoom.getRoomJid() + " because they are not a member and the room is members only.");
     }
 }

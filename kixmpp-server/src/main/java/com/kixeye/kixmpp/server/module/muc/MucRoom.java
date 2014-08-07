@@ -20,6 +20,7 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.KixmppServer;
@@ -31,8 +32,10 @@ import io.netty.util.concurrent.GenericFutureListener;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -45,19 +48,22 @@ public class MucRoom {
     private final KixmppJid roomJid;
     private final String gameId;
     private final String roomId;
-    private ConcurrentHashMap<String, Participant> participantsByNickname = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Channel, Participant> participantsByChannel = new ConcurrentHashMap<>();
-    private String subject;
+    private final MucRoomSettings settings;
+
+    private HashMap<KixmppJid, String> memberNicknamesByBareJid = new HashMap<>();
+    private Map<String, User> usersByNickname = new HashMap<>();
 
     /**
+     * @param server
      * @param roomJid
+     * @param settings
      */
-    public MucRoom(KixmppServer server, KixmppJid roomJid) {
+    public MucRoom(KixmppServer server, KixmppJid roomJid, MucRoomSettings settings) {
         this.server = server;
         this.roomJid = roomJid;
         this.gameId = roomJid.getDomain().split(Pattern.quote("."))[0];
         this.roomId = roomJid.getNode();
-
+        this.settings = new MucRoomSettings(settings);
     }
 
     /**
@@ -69,102 +75,125 @@ public class MucRoom {
         return roomJid;
     }
 
+    public void addMember(KixmppJid jid, String nickname) {
+        jid = jid.withoutResource();
+        checkForNicknameInUse(nickname, jid);
+        memberNicknamesByBareJid.put(jid, nickname);
+    }
+
     /**
-	 * @return the subject
-	 */
-	public String getSubject() {
-		return subject;
-	}
-
-	/**
-	 * @param subject the subject to set
-	 */
-	public void setSubject(String subject) {
-		this.subject = subject;
-	}
-
-	/**
      * A user requests to join the room.
      *
      * @param channel
      * @param nickname
      */
     public void join(Channel channel, String nickname) {
-        synchronized (channel) {
-            KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
-            Participant participant = new Participant(jid, nickname, channel);
-            if (participantsByNickname.putIfAbsent(nickname, participant) == null) {
-                participantsByChannel.put(channel, participant);
+        KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
 
-                Element presence = new Element("presence");
-                presence.setAttribute("id", UUID.randomUUID().toString());
-                presence.setAttribute("from", roomJid.withResource(nickname).toString());
-                presence.setAttribute("to", jid.toString());
+        checkForMemberOnly(jid);
+        checkForNicknameInUse(nickname, jid);
 
-                Element x = new Element("x", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
+        addMember(jid, nickname);
 
-                x.addContent(new Element("item", Namespace.getNamespace("http://jabber.org/protocol/muc#user"))
-                        .setAttribute("affiliation", "member")
-                        .setAttribute("role", "participant"));
+        User user = usersByNickname.get(nickname);
 
-                presence.addContent(x);
-
-                channel.writeAndFlush(presence);
-
-                if (subject != null) {
-	                Element message = new Element("message");
-	                message.setAttribute("id", UUID.randomUUID().toString());
-	                message.setAttribute("from", roomJid.withResource(nickname).toString());
-	                message.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
-	                message.setAttribute("type", "groupchat");
-	
-	                message.addContent(new Element("subject").setText(subject));
-	
-	                channel.writeAndFlush(message);
-                }
-
-                channel.closeFuture().addListener(new CloseChannelListener(channel));
-            } // TODO handle else
+        if (user == null) {
+            user = new User(nickname, jid.withoutResource());
         }
+
+        Client client = user.addClient(new Client(jid, nickname, channel));
+
+        usersByNickname.put(nickname, user);
+
+        Element presence = new Element("presence");
+        presence.setAttribute("id", UUID.randomUUID().toString());
+        presence.setAttribute("from", roomJid.withResource(nickname).toString());
+        presence.setAttribute("to", jid.toString());
+
+        Element x = new Element("x", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
+
+        x.addContent(new Element("item", Namespace.getNamespace("http://jabber.org/protocol/muc#user"))
+                .setAttribute("affiliation", "member")
+                .setAttribute("role", "participant"));
+
+        presence.addContent(x);
+
+        channel.writeAndFlush(presence);
+
+        if (settings.getSubject() != null) {
+            Element message = new Element("message");
+            message.setAttribute("id", UUID.randomUUID().toString());
+            message.setAttribute("from", roomJid.withResource(nickname).toString());
+            message.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString());
+            message.setAttribute("type", "groupchat");
+
+            message.addContent(new Element("subject").setText(settings.getSubject()));
+
+            channel.writeAndFlush(message);
+        }
+
+        channel.closeFuture().addListener(new CloseChannelListener(client));
+    }
+
+    private void checkForNicknameInUse(String nickname, KixmppJid jid) {
+        User user = usersByNickname.get(nickname);
+        if (user != null && !user.getBareJid().equals(jid.withoutResource())) {
+            throw new NicknameInUseException(this, nickname);
+        }
+    }
+
+    private void checkForMemberOnly(KixmppJid jid) {
+        if (settings.isMembersOnly()) {
+            if (memberNicknamesByBareJid.containsKey(jid.withoutResource())) {
+                return;
+            }
+            throw new MembersOnlyException(this, jid);
+        }
+    }
+
+    /**
+     * Remove the {@link User} associated with the given {@link KixmppJid} from the
+     * room.  This will remove all {@link Client}s associated with the {@link User}.
+     *
+     * @param address
+     * @return
+     */
+    public boolean removeUser(KixmppJid address) {
+        String nickname = memberNicknamesByBareJid.get(address.withoutResource());
+        if (nickname == null) {
+            //user is not in the room
+            return false;
+        }
+        User user = usersByNickname.get(nickname);
+        if (user == null) {
+            //user is no longer connected to the room
+            return false;
+        }
+        user.removeClients();
+        removeDisconnectedUser(user);
+        return true;
     }
 
     /**
      * A user leaves the room.
      *
-     * @param channel
+     * @param client
      */
-    public void leave(Channel channel) {
-        synchronized (channel) {
-            Participant participant = participantsByChannel.remove(channel);
-
-            if (participant != null) {
-                participantsByNickname.remove(participant.getNickname());
-            }
-        }
-    }
-
-    public void broadcast(String... messages) {
-        for (Participant participant : participantsByNickname.values()) {
-            for (String message : messages) {
-                Element stanza = createMessage(UUID.randomUUID().toString(),
-                        roomJid,
-                        participant.getJid(),
-                        "groupchat",
-                        message);
-                participant.getChannel().writeAndFlush(stanza);
-            }
-        }
+    private void leave(Client client) {
+        User user = usersByNickname.get(client.getNickname());
+        user.removeClient(client);
+        removeDisconnectedUser(user);
     }
 
     private Element createMessage(String id, KixmppJid from, KixmppJid to, String type, String bodyText) {
-        Element message = new Element("message", Namespace.getNamespace("http://jabber.org/protocol/muc"));
+        Element message = new Element("message");
 
         message.setAttribute("to", to.getFullJid());
         message.setAttribute("from", from.getFullJid());
         message.setAttribute("type", type);
         message.setAttribute("id", id);
 
-        Element body = new Element("body", Namespace.getNamespace("http://jabber.org/protocol/muc"));
+        Element body = new Element("body");
         body.addContent(bodyText);
 
         message.addContent(body);
@@ -176,35 +205,35 @@ public class MucRoom {
     /**
      * Broadcasts a message.
      *
-     * @param channel
-     * @param stanza
+     * @param messages
      */
-    public void broadcast(Channel channel, Element stanza) {
-        String nickname = participantsByChannel.get(channel).getNickname();
-        if (nickname != null) {
-            broadcast(nickname,stanza);
-            server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, nickname, stanza), false);
-        }
+    public void receiveMessages(String... messages) {
+        receiveMessages(roomJid, messages);
     }
-
 
     /**
      * Broadcasts a message using supplied nickname.
      *
-     * @param nickname
-     * @param stanza
+     * @param fromAddress
+     * @param messages
      */
-    public void broadcast(String nickname, Element stanza) {
-        Element body = new Element("body");
-        body.setText(stanza.getChildText("body", Namespace.getNamespace("jabber:client")));
-        for (Channel userChannel : participantsByChannel.keySet()) {
-            Element message = new Element("message");
-            message.setAttribute("id", UUID.randomUUID().toString());
-            message.setAttribute("from", roomJid.withResource(nickname).toString());
-            message.setAttribute("to", userChannel.attr(BindKixmppServerModule.JID).get().toString());
-            message.setAttribute("type", "groupchat");
-            message.addContent(body.clone());
-            userChannel.writeAndFlush(message);
+    public void receiveMessages(KixmppJid fromAddress, String... messages) {
+        if (fromAddress == null) {
+            return;
+        }
+        String fromNickname = memberNicknamesByBareJid.get(fromAddress.withoutResource());
+        //TODO validate fromAddress is roomJid or is a member of the room
+        KixmppJid fromRoomJid = roomJid.withoutResource().withResource(fromNickname);
+
+        for (User to : usersByNickname.values()) {
+            to.receiveMessages(fromRoomJid, messages);
+        }
+        server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, fromRoomJid, messages), false);
+    }
+
+    public void receive(KixmppJid fromAddress, String... messages) {
+        for (User to : usersByNickname.values()) {
+            to.receiveMessages(fromAddress, messages);
         }
     }
 
@@ -229,33 +258,124 @@ public class MucRoom {
         userChannelToInvite.writeAndFlush(message);
     }
 
-    public Collection<Participant> getParticipants() {
-        return Lists.newArrayList(participantsByNickname.values());
+    public Collection<User> getUsers() {
+        return Lists.newArrayList(usersByNickname.values());
+    }
+
+    public Collection<Client> getClients() {
+        List<Client> clients = Lists.newArrayList();
+        for (User user : usersByNickname.values()) {
+            clients.addAll(user.getConnections());
+        }
+        return clients;
     }
 
     private class CloseChannelListener implements GenericFutureListener<Future<? super Void>> {
-        private final Channel channel;
+        private final Client client;
 
         /**
-         * @param channel
+         * @param client
          */
-        public CloseChannelListener(Channel channel) {
-            this.channel = channel;
+        public CloseChannelListener(Client client) {
+            this.client = client;
         }
 
         public void operationComplete(Future<? super Void> future) throws Exception {
-            leave(channel);
+            leave(client);
         }
     }
 
-    public static class Participant {
-        private KixmppJid jid;
+    private void removeDisconnectedUser(User user) {
+        if (user.getClientCount() == 0) {
+            this.usersByNickname.remove(user.getNickname());
+        }
+    }
+
+    /**
+     * Represents a single user within a room. A User owns a unique nickname
+     * within the room, but may have multiple Connections (1 per full JID)
+     */
+    public class User {
+        private String nickname;
+        private KixmppJid bareJid;
+        private Map<Channel, Client> clientsByChannel = new HashMap<>();
+        private Map<KixmppJid, Client> clientsByAddress = new HashMap<>();
+
+        public User(String nickname, KixmppJid bareJid) {
+            this.nickname = nickname;
+            this.bareJid = bareJid.withoutResource();
+        }
+
+        public Client addClient(Client client) {
+            Preconditions.checkNotNull(client.getAddress().getResource());
+
+            clientsByChannel.put(client.getChannel(), client);
+            clientsByAddress.put(client.getAddress(), client);
+
+            return client;
+        }
+
+        public Client getClient(Channel channel) {
+            return clientsByChannel.get(channel);
+        }
+
+        public Client getClient(KixmppJid address) {
+            return clientsByAddress.get(address);
+        }
+
+        public KixmppJid getBareJid() {
+            return bareJid;
+        }
+
+        public void receiveMessages(KixmppJid fromAddress, String... messages) {
+            for (Client client : clientsByAddress.values()) {
+                for (String message : messages) {
+                    Element stanza = createMessage(UUID.randomUUID().toString(),
+                            fromAddress,
+                            client.getAddress(),
+                            "groupchat",
+                            message);
+                    client.getChannel().writeAndFlush(stanza);
+                }
+            }
+        }
+
+        public Collection<Client> getConnections() {
+            return clientsByAddress.values();
+        }
+
+        public void removeClient(Client client) {
+            clientsByAddress.remove(client.getAddress());
+            clientsByChannel.remove(client.getChannel());
+        }
+
+        public String getNickname() {
+            return nickname;
+        }
+
+        public int getClientCount() {
+            return clientsByAddress.size();
+        }
+
+        public void removeClients() {
+            clientsByAddress.clear();
+            clientsByChannel.clear();
+        }
+    }
+
+
+    /**
+     * Represents single connected occupant in the room.
+     */
+    public class Client {
+        private KixmppJid address;
         private String nickname;
         private Channel channel;
-        //private Role role...someday
 
-        public Participant(KixmppJid jid, String nickname, Channel channel) {
-            this.jid = jid;
+        public Client(KixmppJid address, String nickname, Channel channel) {
+            Preconditions.checkNotNull(address.getResource());
+
+            this.address = address;
             this.nickname = nickname;
             this.channel = channel;
         }
@@ -264,8 +384,8 @@ public class MucRoom {
             return nickname;
         }
 
-        public KixmppJid getJid() {
-            return jid;
+        public KixmppJid getAddress() {
+            return address;
         }
 
         public Channel getChannel() {

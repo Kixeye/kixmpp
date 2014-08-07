@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server.cluster.message;
+package com.kixeye.kixmpp.server.module.muc;
 
 /*
  * #%L
@@ -20,26 +20,17 @@ package com.kixeye.kixmpp.server.cluster.message;
  * #L%
  */
 
+import com.kixeye.kixmpp.KixmppException;
 
-import com.kixeye.kixmpp.KixmppJid;
-import com.kixeye.kixmpp.server.module.muc.MucRoom;
+/**
+ * A user attempted to join a MUC room using a nickname that was already in use.
+ *
+ * @author dturner@kixeye.com
+ */
+public class NicknameInUseException extends KixmppException {
+	private static final long serialVersionUID = -5399459625689179197L;
 
-public class RoomBroadcastTask extends RoomTask {
-
-    private KixmppJid from;
-    private String[] messages;
-
-    public RoomBroadcastTask() {
-    }
-
-    public RoomBroadcastTask(MucRoom room, String gameId, String roomId, KixmppJid from, String...messages) {
-        super(room,gameId,roomId);
-        this.from = from;
-        this.messages = messages;
-    }
-
-    @Override
-    public void run() {
-        getRoom().receive(from, messages);
+	public NicknameInUseException(MucRoom mucRoom, String nickname) {
+        super("Nickname " + nickname + " is already in use by another member in room " + mucRoom.getRoomJid());
     }
 }
