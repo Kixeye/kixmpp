@@ -20,23 +20,27 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.kixeye.kixmpp.KixmppJid;
-import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
-import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import io.netty.channel.Channel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import org.jdom2.Element;
-import org.jdom2.Namespace;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+
+import org.jdom2.Element;
+import org.jdom2.Namespace;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.kixeye.kixmpp.KixmppJid;
+import com.kixeye.kixmpp.date.XmppDateUtils;
+import com.kixeye.kixmpp.server.KixmppServer;
+import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
 /**
  * A simple muc room.
@@ -46,13 +50,14 @@ import java.util.regex.Pattern;
 public class MucRoom {
     private final KixmppServer server;
     private final KixmppJid roomJid;
+    private final MucKixmppServerModule mucModule;
     private final String gameId;
     private final String roomId;
     private final MucRoomSettings settings;
 
     private HashMap<KixmppJid, String> memberNicknamesByBareJid = new HashMap<>();
     private Map<String, User> usersByNickname = new HashMap<>();
-
+    
     /**
      * @param server
      * @param roomJid
@@ -63,6 +68,7 @@ public class MucRoom {
         this.roomJid = roomJid;
         this.gameId = roomJid.getDomain().split(Pattern.quote("."))[0];
         this.roomId = roomJid.getNode();
+        this.mucModule = server.module(MucKixmppServerModule.class);
         this.settings = new MucRoomSettings(settings);
     }
 
@@ -80,6 +86,16 @@ public class MucRoom {
         checkForNicknameInUse(nickname, jid);
         memberNicknamesByBareJid.put(jid, nickname);
     }
+    
+    /**
+     * A user requets to join the room.
+     * @param channel
+     * @param nickname
+     * @param mucStanza
+     */
+    public void join(Channel channel, String nickname) {
+    	join(channel, nickname, null);
+    }
 
     /**
      * A user requests to join the room.
@@ -87,7 +103,7 @@ public class MucRoom {
      * @param channel
      * @param nickname
      */
-    public void join(Channel channel, String nickname) {
+    public void join(Channel channel, String nickname, Element mucStanza) {
         KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
 
         checkForMemberOnly(jid);
@@ -127,6 +143,65 @@ public class MucRoom {
             message.addContent(new Element("subject").setText(settings.getSubject()));
 
             channel.writeAndFlush(message);
+        }
+        
+        
+        if (mucStanza != null) {
+        	Element history = mucStanza.getChild("history", mucStanza.getNamespace());
+        	
+        	if (history != null) {
+		        MucHistoryProvider historyProvider = mucModule.getHistoryProvider();
+		        
+		        if (historyProvider != null) {
+		        	Integer maxChars = null;
+		        	Integer maxStanzas = null;
+		        	Integer seconds = null;
+		        	
+		        	String parsableString = history.getAttributeValue("maxchars");
+		        	if (parsableString != null) {
+		        		try {
+		        			maxChars = Integer.parseInt(parsableString);
+		        		} catch (Exception e) {}
+		        	}
+		        	parsableString = history.getAttributeValue("maxstanzas");
+		        	if (parsableString != null) {
+		        		try {
+		        			maxStanzas = Integer.parseInt(parsableString);
+		        		} catch (Exception e) {}
+		        	}
+		        	parsableString = history.getAttributeValue("seconds");
+		        	if (parsableString != null) {
+		        		try {
+		        			seconds = Integer.parseInt(parsableString);
+		        		} catch (Exception e) {}
+		        	}
+		        	
+		        	String since = history.getAttributeValue("since");
+		        	
+		        	List<MucHistory> historyItems = historyProvider.getHistory(roomJid, maxChars, maxStanzas, seconds, since);
+		        	
+		        	if (historyItems != null) {
+		        		for (MucHistory historyItem : historyItems) {
+		        			Element message = new Element("message")
+		        				.setAttribute("id", UUID.randomUUID().toString())
+		        				.setAttribute("from", roomJid.withResource(historyItem.getNickname()).toString())
+		        				.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString())
+		        				.setAttribute("type", "groupchat");
+		        			message.addContent(new Element("body").setText(historyItem.getBody()));
+		        			
+		        			Element addresses = new Element("addresses", Namespace.getNamespace("http://jabber.org/protocol/address"));
+		        			addresses.addContent(new Element("address", addresses.getNamespace()).setAttribute("type", "ofrom").setAttribute("jid", historyItem.getFrom().toString()));
+		        			message.addContent(addresses);
+		        			
+		        			message.addContent(new Element("delay", Namespace.getNamespace("urn:xmpp:delay"))
+		        					.setAttribute("from", roomJid.toString())
+		        					.setAttribute("stamp", XmppDateUtils.format(historyItem.getTimestamp())));
+		        			
+		        			channel.writeAndFlush(message);
+		        		}
+		        	}
+		        }
+        	}
         }
 
         channel.closeFuture().addListener(new CloseChannelListener(client));

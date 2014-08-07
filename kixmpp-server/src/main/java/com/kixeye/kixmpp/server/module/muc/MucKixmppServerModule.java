@@ -20,9 +20,10 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
-import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import io.netty.channel.Channel;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,6 +34,7 @@ import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
 /**
  * Handles presence.
@@ -40,9 +42,20 @@ import com.kixeye.kixmpp.server.module.KixmppServerModule;
  * @author ebahtijaragic
  */
 public class MucKixmppServerModule implements KixmppServerModule {
+	public static final MucHistoryProvider NOOP_HISTORY_PROVIDER = new MucHistoryProvider() {
+		private final List<MucHistory> emptyList = Collections.unmodifiableList(new ArrayList<MucHistory>(0));
+		
+		@Override
+		public List<MucHistory> getHistory(KixmppJid roomJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
+			return emptyList;
+		}
+	};
+	
 	private KixmppServer server;
 	
 	private ConcurrentHashMap<String, MucService> services = new ConcurrentHashMap<>();
+	
+	private MucHistoryProvider historyProvider = NOOP_HISTORY_PROVIDER;
 	
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#install(com.kixeye.kixmpp.server.KixmppServer)
@@ -103,6 +116,20 @@ public class MucKixmppServerModule implements KixmppServerModule {
 		return null;
 	}
 	
+	/**
+	 * @return the historyProvider
+	 */
+	public MucHistoryProvider getHistoryProvider() {
+		return historyProvider;
+	}
+
+	/**
+	 * @param historyProvider the historyProvider to set
+	 */
+	public void setHistoryProvider(MucHistoryProvider historyProvider) {
+		this.historyProvider = historyProvider;
+	}
+
 	private KixmppStanzaHandler JOIN_ROOM_HANDLER = new KixmppStanzaHandler() {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
@@ -119,7 +146,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 					MucRoom room = service.getRoom(fullRoomJid.getNode());
 					
 					if (room != null) {
-						room.join(channel, fullRoomJid.getResource());
+						room.join(channel, fullRoomJid.getResource(), x);
 					} // TODO handle else
 				} // TODO handle else
 			}

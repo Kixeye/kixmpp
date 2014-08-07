@@ -22,6 +22,8 @@ package com.kixeye.kixmpp.server;
 
 import io.netty.handler.ssl.SslContext;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -47,6 +49,8 @@ import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceListener;
 import com.kixeye.kixmpp.server.module.auth.InMemoryAuthenticationService;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
+import com.kixeye.kixmpp.server.module.muc.MucHistory;
+import com.kixeye.kixmpp.server.module.muc.MucHistoryProvider;
 import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
 
 /**
@@ -167,6 +171,80 @@ public class KixmppServerTest {
 
 				Assert.assertNotNull(mucMessage);
 				Assert.assertEquals("someMessage", mucMessage.getBody());
+			}
+		}
+	}
+	
+	@Test
+	public void testSimpleUsingKixmppWithHistory() throws Exception {
+		try (KixmppServer server = new KixmppServer("testChat")) {
+			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
+
+			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
+			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
+			
+			server.module(MucKixmppServerModule.class).setHistoryProvider(new MucHistoryProvider() {
+				public List<MucHistory> getHistory(KixmppJid roomJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
+					List<MucHistory> history = new ArrayList<>(maxStanzas);
+					
+					for (int i = 0; i < maxStanzas; i++) {
+						history.add(new MucHistory(KixmppJid.fromRawJid("user" + i + "@" + server.getDomain() + "/computer"), roomJid, 
+								"nick" + i, "message" + i, System.currentTimeMillis()));
+					}
+					
+					return history;
+				}
+			});
+
+			try (KixmppClient client = new KixmppClient(
+					SslContext.newClientContext())) {
+				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();
+				final LinkedBlockingQueue<MucJoin> mucJoins = new LinkedBlockingQueue<>();
+				final LinkedBlockingQueue<MucMessage> mucMessages = new LinkedBlockingQueue<>();
+
+				Assert.assertNotNull(client.connect("localhost",
+						server.getBindAddress().getPort(), server.getDomain())
+						.get(2, TimeUnit.SECONDS));
+
+				client.module(PresenceKixmppClientModule.class)
+						.addPresenceListener(new PresenceListener() {
+							public void handle(Presence presence) {
+								presences.offer(presence);
+							}
+						});
+
+				client.module(MucKixmppClientModule.class).addJoinListener(
+						new MucListener<MucJoin>() {
+							public void handle(MucJoin event) {
+								mucJoins.offer(event);
+							}
+						});
+
+				client.module(MucKixmppClientModule.class).addMessageListener(
+						new MucListener<MucMessage>() {
+							public void handle(MucMessage event) {
+								mucMessages.offer(event);
+							}
+						});
+
+				Assert.assertNotNull(client.login("testUser", "testPassword", "testResource").get(2, TimeUnit.SECONDS));
+				client.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
+
+				Assert.assertNotNull(presences.poll(2, TimeUnit.SECONDS));
+
+				client.module(MucKixmppClientModule.class).joinRoom(KixmppJid.fromRawJid("someRoom@conference.testChat"), "testNick", 5, null, null, null);
+
+				MucJoin mucJoin = mucJoins.poll(2, TimeUnit.SECONDS);
+
+				Assert.assertNotNull(mucJoin);
+
+				int count = 0;
+				
+				while (mucMessages.poll(2, TimeUnit.SECONDS) != null) {
+					count++;
+				}
+				
+				Assert.assertEquals(5, count);
 			}
 		}
 	}

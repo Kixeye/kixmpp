@@ -28,12 +28,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.jdom2.Element;
 import org.jdom2.Namespace;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.client.module.KixmppClientModule;
+import com.kixeye.kixmpp.date.XmppDateUtils;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 
 /**
@@ -98,7 +100,7 @@ public class MucKixmppClientModule implements KixmppClientModule {
 	 * @param roomJid
 	 * @param nickname
 	 */
-	public void joinRoom(KixmppJid roomJid, String nickname) {
+	public void joinRoom(KixmppJid roomJid, String nickname, Integer maxStanzas, Integer maxChars, Integer seconds, DateTime since) {
 		Element presence = new Element("presence");
 		presence.setAttribute("from", client.getJid());
 		presence.setAttribute("to", roomJid + "/" + nickname);
@@ -107,10 +109,31 @@ public class MucKixmppClientModule implements KixmppClientModule {
 		presence.addContent(x);
 
 		Element history = new Element("history", "http://jabber.org/protocol/muc");
-		history.setAttribute("maxstanzas", "0");
+		if (maxStanzas != null) {
+			history.setAttribute("maxstanzas", maxStanzas.toString());
+		}
+		if (maxChars != null) {
+			history.setAttribute("maxchars", maxChars.toString());
+		}
+		if (seconds != null) {
+			history.setAttribute("seconds", seconds.toString());
+		}
+		if (since != null) {
+			history.setAttribute("since", XmppDateUtils.format(since));
+		}
 		x.addContent(history);
 		
 		client.sendStanza(presence);
+	}
+	
+	/**
+	 * Joins a room.
+	 * 
+	 * @param roomJid
+	 * @param nickname
+	 */
+	public void joinRoom(KixmppJid roomJid, String nickname) {
+		joinRoom(roomJid, nickname, null, null, null, null);
 	}
 	
 	/**

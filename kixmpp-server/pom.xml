@@ -41,11 +41,11 @@
 			<artifactId>kixmpp-core</artifactId>
 			<version>${parent.version}</version>
 		</dependency>
-        <dependency>
-            <groupId>${parent.groupId}</groupId>
-            <artifactId>kixmpp-p2p</artifactId>
-            <version>${parent.version}</version>
-        </dependency>
+		<dependency>
+			<groupId>${parent.groupId}</groupId>
+			<artifactId>kixmpp-p2p</artifactId>
+			<version>${parent.version}</version>
+		</dependency>
 
 		<!-- Netty -->
 		<dependency>
@@ -87,12 +87,12 @@
 			<version>${slf4j.version}</version>
 		</dependency>
 
-        <!-- util -->
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>${guava.version}</version>
-        </dependency>
+		<!-- util -->
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>${guava.version}</version>
+		</dependency>
 
 		<!-- Testing -->
 		<dependency>
@@ -149,11 +149,11 @@
 			<version>4.0.2</version>
 			<scope>test</scope>
 		</dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>${mockito.version}</version>
-            <scope>test</scope>
-        </dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>${mockito.version}</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 </project>
