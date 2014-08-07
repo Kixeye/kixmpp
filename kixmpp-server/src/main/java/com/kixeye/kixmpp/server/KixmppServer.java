@@ -1,15 +1,5 @@
 package com.kixeye.kixmpp.server;
 
-import com.kixeye.kixmpp.p2p.ClusterClient;
-import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
-import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
-import com.kixeye.kixmpp.p2p.listener.ClusterListener;
-import com.kixeye.kixmpp.p2p.node.NodeId;
-import com.kixeye.kixmpp.server.cluster.task.ClusterTask;
-import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
-import com.kixeye.kixmpp.server.cluster.task.RoomTask;
-import com.kixeye.kixmpp.server.module.muc.MucRoom;
-import com.kixeye.kixmpp.server.module.muc.MucService;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
@@ -28,12 +18,14 @@ import io.netty.util.concurrent.GenericFutureListener;
 import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 
 import org.jdom2.Element;
 import org.slf4j.Logger;
@@ -41,18 +33,30 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.Striped;
 import com.kixeye.kixmpp.KixmppCodec;
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
+import com.kixeye.kixmpp.p2p.ClusterClient;
+import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
+import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
+import com.kixeye.kixmpp.p2p.listener.ClusterListener;
+import com.kixeye.kixmpp.p2p.node.NodeId;
+import com.kixeye.kixmpp.server.cluster.task.ClusterTask;
+import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
+import com.kixeye.kixmpp.server.cluster.task.RoomTask;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import com.kixeye.kixmpp.server.module.disco.DiscoKixmppServerModule;
 import com.kixeye.kixmpp.server.module.features.FeaturesKixmppServerModule;
 import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
+import com.kixeye.kixmpp.server.module.muc.MucRoom;
+import com.kixeye.kixmpp.server.module.muc.MucService;
 import com.kixeye.kixmpp.server.module.presence.PresenceKixmppServerModule;
 import com.kixeye.kixmpp.server.module.roster.RosterKixmppServerModule;
 import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
@@ -102,6 +106,10 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	private final AtomicReference<ChannelFuture> channelFuture = new AtomicReference<>();
 	private final AtomicReference<Channel> channel = new AtomicReference<>();
 	private AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
+	
+	private final ConcurrentHashMap<KixmppJid, Channel> jidChannel = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<String, Set<Channel>> usernameChannel = new ConcurrentHashMap<>();
+	private final Striped<Lock> usernameChannelStripes = Striped.lock(Runtime.getRuntime().availableProcessors() * 4);
 
     private static enum State {
 		STARTING,
@@ -121,6 +129,16 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 */
 	public KixmppServer(String domain) {
 		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), DEFAULT_SOCKET_ADDRESS, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery() );
+	}
+	
+	/**
+	 * Creates a new {@link KixmppServer} with the given ssl engine.
+	 * 
+	 * @param bindAddress
+	 * @param domain
+	 */
+	public KixmppServer(InetSocketAddress bindAddress, String domain) {
+		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), bindAddress, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery());
 	}
 	
 	/**
@@ -190,7 +208,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		final SettableFuture<KixmppServer> responseFuture = SettableFuture.create();
 
 		channelFuture.set(bootstrap.bind(bindAddress));
-		
+
 		channelFuture.get().addListener(new GenericFutureListener<Future<? super Void>>() {
 			@Override
 			public void operationComplete(Future<? super Void> future) throws Exception {
@@ -370,6 +388,53 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
     	return interceptors.remove(interceptor);
     }
     
+    /**
+     * Gets a channel that is assigned to this JID.
+     * 
+     * @param jid
+     * @return
+     */
+    public Channel getChannel(KixmppJid jid) {
+    	return jidChannel.get(jid);
+    }
+    
+    /**
+     * Gets channel by username.
+     * 
+     * @param username
+     * @return
+     */
+    public Set<Channel> getChannels(String username) {
+    	return Collections.unmodifiableSet(usernameChannel.get(username));
+    }
+    
+    /**
+     * Adds a channel mapping.
+     * 
+     * @param jid
+     * @param channel
+     */
+    public void addChannelMapping(KixmppJid jid, Channel channel) {
+    	jidChannel.put(jid, channel);
+    	
+    	Lock lock = usernameChannelStripes.get(jid.getNode());
+    	
+    	try {
+    		lock.lock();
+    		
+    		Set<Channel> channels = usernameChannel.get(jid.getNode());
+    		
+    		if (channels == null) {
+    			channels = new HashSet<>();
+    			channels.add(channel);
+    		}
+    		
+        	usernameChannel.put(jid.getNode(), channels);
+    	} finally {
+    		lock.unlock();
+    	}
+    }
+    
 	/**
      * Tries to install module.
      * 
@@ -494,6 +559,21 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 			logger.debug("Channel [{}] disconnected.", ctx.channel());
 
+			KixmppJid jid = ctx.channel().attr(BindKixmppServerModule.JID).get();
+			
+			if (jid != null) {
+				jidChannel.remove(jid);
+				
+				Lock lock = usernameChannelStripes.get(jid.getNode());
+				
+				try {
+					lock.lock();
+					usernameChannel.remove(jid.getNode());
+				} finally {
+					lock.unlock();
+				}
+			}
+			
 			eventEngine.publishDisconnected(ctx.channel());
 		}
 		

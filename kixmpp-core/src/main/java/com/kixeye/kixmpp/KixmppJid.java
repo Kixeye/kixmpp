@@ -54,7 +54,7 @@ public class KixmppJid {
 		assert domain != null && !domain.isEmpty() : "Argument 'domain' cannot be null or empty";
 
 		this.node = node;
-		this.domain = domain;
+		this.domain = domain.toLowerCase();
 		this.resource = resource;
 	}
 	
