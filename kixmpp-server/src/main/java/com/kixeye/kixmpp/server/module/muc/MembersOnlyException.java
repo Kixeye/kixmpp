@@ -29,7 +29,9 @@ import com.kixeye.kixmpp.KixmppJid;
  * @author dturner@kixeye.com
  */
 public class MembersOnlyException extends KixmppException {
-    public MembersOnlyException(MucRoom mucRoom, KixmppJid jid) {
+	private static final long serialVersionUID = 8605187410416156957L;
+
+	public MembersOnlyException(MucRoom mucRoom, KixmppJid jid) {
         super(jid + " cannot join room " + mucRoom.getRoomJid() + " because they are not a member and the room is members only.");
     }
 }
