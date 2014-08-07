@@ -23,7 +23,7 @@ package com.kixeye.kixmpp.server.module.muc;
 import com.google.common.collect.Lists;
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
+import com.kixeye.kixmpp.server.cluster.message.RoomBroadcastTask;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import io.netty.channel.Channel;
 import io.netty.util.concurrent.Future;

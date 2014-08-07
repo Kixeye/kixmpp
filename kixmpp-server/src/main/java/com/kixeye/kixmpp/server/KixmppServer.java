@@ -1,5 +1,7 @@
 package com.kixeye.kixmpp.server;
 
+import com.kixeye.kixmpp.server.cluster.mapreduce.MapReduceTracker;
+import com.kixeye.kixmpp.server.cluster.message.*;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
@@ -46,9 +48,6 @@ import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
 import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
 import com.kixeye.kixmpp.p2p.listener.ClusterListener;
 import com.kixeye.kixmpp.p2p.node.NodeId;
-import com.kixeye.kixmpp.server.cluster.task.ClusterTask;
-import com.kixeye.kixmpp.server.cluster.task.RoomBroadcastTask;
-import com.kixeye.kixmpp.server.cluster.task.RoomTask;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
@@ -120,6 +119,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	}
 
     private final ClusterClient cluster;
+    private final MapReduceTracker mapReduce;
     private final ScheduledExecutorService scheduledExecutorService;
 
     /**
@@ -174,6 +174,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
         scheduledExecutorService = Executors.newScheduledThreadPool( Runtime.getRuntime().availableProcessors() );
         cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, scheduledExecutorService );
         cluster.getMessageRegistry().addCustomMessage(1, RoomBroadcastTask.class);
+        mapReduce = new MapReduceTracker(this);
 
 		this.bindAddress = bindAddress;
 		this.domain = domain.toLowerCase();
@@ -621,6 +622,13 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
             }
             roomTask.setRoom(room);
             getEventEngine().publishTask(room.getRoomJid(),roomTask);
+        } else if (message instanceof MapReduceRequest) {
+            MapReduceRequest request = (MapReduceRequest) message;
+            request.setSenderId(senderId);
+            getEventEngine().publishTask(request.getTargetJID(),request);
+        } else if (message instanceof MapReduceResponse) {
+            MapReduceResponse response = (MapReduceResponse) message;
+            mapReduce.processResponse(response);
         }
     }
 }

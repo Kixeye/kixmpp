@@ -1,4 +1,4 @@
-package com.kixeye.kixmpp.server.cluster.task;
+package com.kixeye.kixmpp.server.cluster.message;
 
 /*
  * #%L
