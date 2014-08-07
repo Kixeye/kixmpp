@@ -31,6 +31,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.nio.NioEventLoopGroup;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -44,6 +45,11 @@ import java.util.concurrent.*;
 public class NodeServerTest {
 
     private final Logger logger = LoggerFactory.getLogger(NodeServerTest.class);
+
+    @Before
+    public void setup() {
+        System.setProperty("io.netty.leakDetectionLevel","PARANOID");
+    }
 
     @Test(expected = java.net.BindException.class)
     public void portAlreadyInUseTest() {

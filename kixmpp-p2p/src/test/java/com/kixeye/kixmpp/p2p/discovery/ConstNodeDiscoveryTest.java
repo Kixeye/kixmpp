@@ -20,7 +20,6 @@ package com.kixeye.kixmpp.p2p.discovery;
  * #L%
  */
 
-import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
 import com.kixeye.kixmpp.p2p.node.NodeAddress;
 import org.junit.Assert;
 import org.junit.Test;

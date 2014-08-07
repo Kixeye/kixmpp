@@ -26,7 +26,10 @@ import com.kixeye.kixmpp.p2p.message.JoinResponse;
 import com.kixeye.kixmpp.p2p.message.MessageRegistry;
 import com.kixeye.kixmpp.p2p.message.MessageWrapper;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.EventLoopGroup;
 
 public class RemoteNode extends Node {
 

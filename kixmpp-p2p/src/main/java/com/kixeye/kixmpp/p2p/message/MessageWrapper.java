@@ -23,8 +23,6 @@ package com.kixeye.kixmpp.p2p.message;
 import com.kixeye.kixmpp.p2p.serialization.ProtostuffEncoder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
