@@ -25,10 +25,8 @@ import com.kixeye.kixmpp.p2p.message.JoinRequest;
 import com.kixeye.kixmpp.p2p.message.JoinResponse;
 import com.kixeye.kixmpp.p2p.message.MessageRegistry;
 import com.kixeye.kixmpp.p2p.message.MessageWrapper;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.EventLoopGroup;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.*;
 
 public class RemoteNode extends Node {
 
@@ -73,7 +71,8 @@ public class RemoteNode extends Node {
     @Override
     public void sendMessage(MessageWrapper wrapper) {
         if (channel != null) {
-            channel.writeAndFlush(wrapper.getMessage());
+            ByteBuf buf = wrapper.getSerialized(cluster.getMessageRegistry());
+            channel.writeAndFlush(buf.retain());
         }
     }
 

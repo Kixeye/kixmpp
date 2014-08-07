@@ -23,6 +23,8 @@ package com.kixeye.kixmpp.p2p.message;
 import com.kixeye.kixmpp.p2p.serialization.ProtostuffEncoder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +38,7 @@ public class MessageWrapper {
     private static final Logger logger = LoggerFactory.getLogger(MessageWrapper.class);
 
     private Object message;
-    private ByteBuf serialized;
+    private ByteBuf buf;
 
     public static MessageWrapper wrap(Object message) {
         return new MessageWrapper(message);
@@ -44,7 +46,7 @@ public class MessageWrapper {
 
     public MessageWrapper(Object message) {
         this.message = message;
-        this.serialized = null;
+        this.buf = null;
     }
 
     public Object getMessage() {
@@ -52,13 +54,20 @@ public class MessageWrapper {
     }
 
     public ByteBuf getSerialized(MessageRegistry messageRegistry) {
-        if (serialized == null) {
+        if (buf == null) {
             try {
-                serialized = ProtostuffEncoder.serializeToByteBuf(messageRegistry, Unpooled.buffer(), message);
+                buf = ProtostuffEncoder.serializeToByteBuf(messageRegistry, Unpooled.directBuffer(256), message);
             } catch (IOException e) {
                 logger.error("Exception serializing message", e);
             }
         }
-        return serialized;
+        return buf;
+    }
+
+    public void release() {
+        if (buf != null) {
+            buf.release();
+            buf = null;
+        }
     }
 }

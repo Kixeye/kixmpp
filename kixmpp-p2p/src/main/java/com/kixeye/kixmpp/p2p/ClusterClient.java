@@ -114,7 +114,9 @@ public class ClusterClient {
     public void sendMessage(NodeId destinationNodeId, Object msg) {
         Node node = idToNode.get(destinationNodeId);
         if (node != null) {
-            node.sendMessage(MessageWrapper.wrap(msg));
+            MessageWrapper wrapper = MessageWrapper.wrap(msg);
+            node.sendMessage(wrapper);
+            wrapper.release();
         }
     }
 
@@ -131,6 +133,7 @@ public class ClusterClient {
                 node.sendMessage(wrapper);
             }
         }
+        wrapper.release();
     }
 
 
@@ -146,6 +149,7 @@ public class ClusterClient {
             }
             node.sendMessage(wrapper);
         }
+        wrapper.release();
     }
 
 
