@@ -20,6 +20,7 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import io.netty.channel.Channel;
 
 import java.util.List;
@@ -140,7 +141,8 @@ public class MucKixmppServerModule implements KixmppServerModule {
 					MucRoom room = service.getRoom(fullRoomJid.getNode());
 
 					if (room != null) {
-						room.broadcast(channel, stanza);
+                        String message = stanza.getChildText("body");
+                        room.receiveMessages(channel.attr(BindKixmppServerModule.JID).get(),message);
 					} // TODO handle else
 				} // TODO handle else
 			}

@@ -41,13 +41,21 @@ public interface MucService {
      */
     public void broadcast(String...messages);
 
-	/**
-	 * Adds a {@link MucRoom}.
-	 * 
-	 * @param name
-	 * @return
-	 */
-	public MucRoom addRoom(String name);
+    /**
+     * Adds a {@link MucRoom}.
+     *
+     * @param name
+     * @return
+     */
+    public MucRoom addRoom(String name);
+
+    /**
+     * Adds a {@link MucRoom}.
+     *
+     * @param name
+     * @return
+     */
+    public MucRoom addRoom(String name, MucRoomSettings options);
 	
 	/**
 	 * Gets a {@link MucRoom}.

@@ -21,25 +21,26 @@ package com.kixeye.kixmpp.server.cluster.task;
  */
 
 
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.module.muc.MucRoom;
 import org.jdom2.Element;
 
 public class RoomBroadcastTask extends RoomTask {
 
-    private String from;
-    private Element body;
+    private KixmppJid from;
+    private String[] messages;
 
     public RoomBroadcastTask() {
     }
 
-    public RoomBroadcastTask(MucRoom room, String gameId, String roomId, String from, Element body) {
+    public RoomBroadcastTask(MucRoom room, String gameId, String roomId, KixmppJid from, String...messages) {
         super(room,gameId,roomId);
         this.from = from;
-        this.body = body;
+        this.messages = messages;
     }
 
     @Override
     public void run() {
-        getRoom().broadcast(from,body);
+        getRoom().receiveMessages(from, messages, false);
     }
 }

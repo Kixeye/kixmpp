@@ -56,30 +56,37 @@ public class InMemoryMucService implements MucService {
     @Override
     public void broadcast(String... messages) {
         for(MucRoom room:rooms.values()){
-            room.broadcast(messages);
+            room.receiveMessages(messages);
         }
     }
 
     /**
-	 * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String)
-	 */
-	public MucRoom addRoom(String name) {
-		name = name.toLowerCase();
-		
-		MucRoom mucRoom = rooms.get(name);
-		
-		if (mucRoom == null) {
-			mucRoom = new MucRoom(server, new KixmppJid(name,serviceDomain));
-			
-			MucRoom prevRoom = rooms.putIfAbsent(name, mucRoom);
-			
-			if (prevRoom != null) {
-				mucRoom = prevRoom;
-			}
-		}
-		
-		return mucRoom;
-	}
+     * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String)
+     */
+    public MucRoom addRoom(String name) {
+        return addRoom(name, new MucRoomSettings());
+    }
+
+    /**
+     * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String)
+     */
+    public MucRoom addRoom(String name, MucRoomSettings options) {
+        name = name.toLowerCase();
+
+        MucRoom mucRoom = rooms.get(name);
+
+        if (mucRoom == null) {
+            mucRoom = new MucRoom(server, new KixmppJid(name,serviceDomain), options);
+
+            MucRoom prevRoom = rooms.putIfAbsent(name, mucRoom);
+
+            if (prevRoom != null) {
+                mucRoom = prevRoom;
+            }
+        }
+
+        return mucRoom;
+    }
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.muc.MucService#getRoom(java.lang.String)
