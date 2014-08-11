@@ -27,6 +27,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 
+import org.fusesource.hawtdispatch.Task;
 import org.jdom2.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -620,13 +621,19 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
     @Override
     public void onMessage(ClusterClient cluster, NodeId senderId, Object message) {
 
+        // inject server reference
         if (message instanceof ClusterTask) {
-            // inject server reference
             ((ClusterTask) message).setKixmppServer(this);
         }
 
-        if (message instanceof RoomTask) {
-            // if room exists, queue task for execution
+        if (message instanceof MapReduceRequest) {
+            MapReduceRequest request = (MapReduceRequest) message;
+            request.setSenderId(senderId);
+            getEventEngine().publishTask(request.getTargetJID(),request);
+        } else if (message instanceof MapReduceResponse) {
+            MapReduceResponse response = (MapReduceResponse) message;
+            mapReduce.processResponse(response);
+        } else  if (message instanceof RoomTask) {
             RoomTask roomTask = (RoomTask) message;
             MucKixmppServerModule mucModule = module(MucKixmppServerModule.class);
             MucService service = mucModule.getService(roomTask.getGameId());
@@ -639,13 +646,9 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
             }
             roomTask.setRoom(room);
             getEventEngine().publishTask(room.getRoomJid(),roomTask);
-        } else if (message instanceof MapReduceRequest) {
-            MapReduceRequest request = (MapReduceRequest) message;
-            request.setSenderId(senderId);
-            getEventEngine().publishTask(request.getTargetJID(),request);
-        } else if (message instanceof MapReduceResponse) {
-            MapReduceResponse response = (MapReduceResponse) message;
-            mapReduce.processResponse(response);
+        } else if (message instanceof Task) {
+            Task task = (Task) message;
+            task.run();
         }
     }
 }
