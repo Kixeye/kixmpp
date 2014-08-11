@@ -35,6 +35,10 @@ public abstract class MapReduceResponse extends ClusterTask {
         this.transactionId = transactionId;
     }
 
+    public void setTransactionId(UUID transactionId) {
+        this.transactionId = transactionId;
+    }
+
     public UUID getTransactionId() {
         return transactionId;
     }

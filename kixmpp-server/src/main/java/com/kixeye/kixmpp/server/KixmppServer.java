@@ -93,7 +93,8 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	
 	public static final InetSocketAddress DEFAULT_SOCKET_ADDRESS = new InetSocketAddress(5222);
     public static final InetSocketAddress DEFAULT_CLUSTER_ADDRESS = new InetSocketAddress(8100);
-	
+    public static final int CUSTOM_MESSAGE_START = 16;
+
 	private final InetSocketAddress bindAddress;
 	private final String domain;
 	
@@ -162,7 +163,6 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 * @param eventEngine
 	 * @param bindAddress
 	 * @param domain
-	 * @param sslContext
 	 */
 	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, KixmppEventEngine eventEngine, InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery) {
 		bootstrap = new ServerBootstrap()
@@ -197,7 +197,6 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	/**
 	 * Starts the server.
 	 * 
-	 * @param port
 	 * @throws Exception
 	 */
 	public ListenableFuture<KixmppServer> start() throws Exception {
@@ -451,7 +450,6 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
      * Tries to install module.
      * 
      * @param moduleClassName
-     * @throws Exception
      */
 	private KixmppServerModule installModule(String moduleClassName) {
 		KixmppServerModule module = null;
@@ -599,6 +597,14 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 
     public ClusterClient getCluster() {
         return cluster;
+    }
+
+    public void sendMapReduceRequest(MapReduceRequest request) {
+        mapReduce.sendRequest(request);
+    }
+
+    public void registerCustomMessage(int id, Class<?> clazz) {
+        cluster.getMessageRegistry().addCustomMessage(CUSTOM_MESSAGE_START + id, clazz);
     }
 
     @Override
