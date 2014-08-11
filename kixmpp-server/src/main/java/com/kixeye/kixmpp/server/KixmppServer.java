@@ -1,7 +1,5 @@
 package com.kixeye.kixmpp.server;
 
-import com.kixeye.kixmpp.server.cluster.mapreduce.MapReduceTracker;
-import com.kixeye.kixmpp.server.cluster.message.*;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
@@ -48,6 +46,12 @@ import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
 import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
 import com.kixeye.kixmpp.p2p.listener.ClusterListener;
 import com.kixeye.kixmpp.p2p.node.NodeId;
+import com.kixeye.kixmpp.server.cluster.mapreduce.MapReduceTracker;
+import com.kixeye.kixmpp.server.cluster.message.ClusterTask;
+import com.kixeye.kixmpp.server.cluster.message.MapReduceRequest;
+import com.kixeye.kixmpp.server.cluster.message.MapReduceResponse;
+import com.kixeye.kixmpp.server.cluster.message.RoomBroadcastTask;
+import com.kixeye.kixmpp.server.cluster.message.RoomTask;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
@@ -405,8 +409,15 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
      * @param username
      * @return
      */
-    public Set<Channel> getChannels(String username) {
-    	return Collections.unmodifiableSet(usernameChannel.get(username));
+    @SuppressWarnings("unchecked")
+	public Set<Channel> getChannels(String username) {
+    	Set<Channel> channels = usernameChannel.get(username);
+    	
+    	if (channels != null) {
+    		return Collections.unmodifiableSet(usernameChannel.get(username));
+    	} else {
+    		return Collections.EMPTY_SET;
+    	}
     }
     
     /**
