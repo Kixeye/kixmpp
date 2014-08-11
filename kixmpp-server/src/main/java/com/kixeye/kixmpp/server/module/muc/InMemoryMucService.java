@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.KixmppServer;
+import org.fusesource.hawtdispatch.Task;
 
 /**
  * A {@link MucService} that persists rooms in memory.
@@ -54,9 +55,15 @@ public class InMemoryMucService implements MucService {
     }
 
     @Override
-    public void broadcast(String... messages) {
+    public void broadcast(final String... messages) {
         for(MucRoom room:rooms.values()){
-            room.receiveMessages(messages);
+            final MucRoom tmp = room;
+            server.getEventEngine().publishTask( room.getRoomJid(), new Task() {
+                @Override
+                public void run() {
+                    tmp.receiveMessages(messages);
+                }
+            });
         }
     }
 
