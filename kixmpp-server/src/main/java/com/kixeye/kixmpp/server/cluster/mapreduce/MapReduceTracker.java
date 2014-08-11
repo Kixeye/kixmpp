@@ -20,15 +20,19 @@ package com.kixeye.kixmpp.server.cluster.mapreduce;
  * #L%
  */
 
-import com.google.common.cache.*;
-import com.kixeye.kixmpp.server.KixmppServer;
-import com.kixeye.kixmpp.server.cluster.message.MapReduceRequest;
-import com.kixeye.kixmpp.server.cluster.message.MapReduceResponse;
-
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalCause;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
+import com.kixeye.kixmpp.server.KixmppServer;
+import com.kixeye.kixmpp.server.cluster.message.MapReduceRequest;
+import com.kixeye.kixmpp.server.cluster.message.MapReduceResponse;
 
 /**
  * MapReduceTracker tracks pending MapReduceRequests and completes them when all
@@ -37,12 +41,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.RequestWrapper> {
     private final KixmppServer server;
     private final Cache<UUID,RequestWrapper> requests;
-    private final ScheduledExecutorService scheduledExecutorService;
-
 
     public MapReduceTracker(KixmppServer server, ScheduledExecutorService scheduledExecutorService) {
         this.server = server;
-        this.scheduledExecutorService = scheduledExecutorService;
         this.requests = CacheBuilder.newBuilder()
                 .expireAfterWrite(15, TimeUnit.SECONDS)
                 .removalListener(this)
