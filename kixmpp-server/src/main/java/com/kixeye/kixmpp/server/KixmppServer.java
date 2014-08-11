@@ -174,7 +174,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
         scheduledExecutorService = Executors.newScheduledThreadPool( Runtime.getRuntime().availableProcessors() );
         cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, scheduledExecutorService );
         cluster.getMessageRegistry().addCustomMessage(1, RoomBroadcastTask.class);
-        mapReduce = new MapReduceTracker(this);
+        mapReduce = new MapReduceTracker(this, scheduledExecutorService);
 
 		this.bindAddress = bindAddress;
 		this.domain = domain.toLowerCase();
