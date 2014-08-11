@@ -116,6 +116,15 @@ public class KixmppClient implements AutoCloseable {
 	 * 
 	 * @param sslContext
 	 */
+	public KixmppClient() {
+		this(new NioEventLoopGroup(), new KixmppEventEngine(), null);
+	}
+	
+	/**
+	 * Creates a new {@link KixmppClient} with the given ssl engine.
+	 * 
+	 * @param sslContext
+	 */
 	public KixmppClient(SslContext sslContext) {
 		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext);
 	}
@@ -129,7 +138,9 @@ public class KixmppClient implements AutoCloseable {
 	 * @param sslContext
 	 */
 	public KixmppClient(EventLoopGroup eventLoopGroup, KixmppEventEngine eventEngine, SslContext sslContext) {
-		assert sslContext.isClient() : "The given SslContext must be a client context.";
+		if (sslContext != null) {
+			assert sslContext.isClient() : "The given SslContext must be a client context.";
+		}
 		
 		bootstrap = new Bootstrap()
 			.group(eventLoopGroup)
