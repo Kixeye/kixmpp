@@ -76,15 +76,26 @@ public class InMemoryMucService implements MucService {
     }
 
     /**
-     * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String)
+     * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String, com.kixeye.kixmpp.server.module.muc.MucRoomSettings)
      */
     public MucRoom addRoom(String name, MucRoomSettings options) {
+        return addRoom(name, new MucRoomSettings(), null, null);
+    }
+    
+	/**
+	 * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String, com.kixeye.kixmpp.server.module.muc.MucRoomSettings, com.kixeye.kixmpp.KixmppJid, java.lang.String)
+	 */
+	public MucRoom addRoom(String name, MucRoomSettings options, KixmppJid owner, String ownerNickname) {
         name = name.toLowerCase();
 
         MucRoom mucRoom = rooms.get(name);
 
         if (mucRoom == null) {
             mucRoom = new MucRoom(this, new KixmppJid(name, subDomain + "." + server.getDomain()), options);
+            
+            if (owner != null) {
+            	mucRoom.addUser(owner, ownerNickname, MucRole.Moderator, MucAffiliation.Owner);
+            }
 
             MucRoom prevRoom = rooms.putIfAbsent(name, mucRoom);
 
@@ -94,7 +105,7 @@ public class InMemoryMucService implements MucService {
         }
 
         return mucRoom;
-    }
+	}
 
 	/**
 	 * @see com.kixeye.kixmpp.server.module.muc.MucService#getRoom(java.lang.String)

@@ -22,6 +22,7 @@ package com.kixeye.kixmpp.server.module.muc;
 
 import java.util.List;
 
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.KixmppServer;
 
 /**
@@ -55,10 +56,22 @@ public interface MucService {
      * Adds a {@link MucRoom}.
      *
      * @param name
+     * @param options
      * @return
      */
     public MucRoom addRoom(String name, MucRoomSettings options);
-	
+
+    /**
+     * Adds a {@link MucRoom}.
+     *
+     * @param name
+     * @param options
+     * @param owner
+     * @param ownerNickname
+     * @return
+     */
+    public MucRoom addRoom(String name, MucRoomSettings options, KixmppJid owner, String ownerNickname);
+    
 	/**
 	 * Gets a {@link MucRoom}.
 	 * 
