@@ -73,7 +73,7 @@ public class SerializationTest {
         }
     }
 
-    static private class DataObject {
+    public static class DataObject {
         private int integerValue;
         private String stringValue;
 

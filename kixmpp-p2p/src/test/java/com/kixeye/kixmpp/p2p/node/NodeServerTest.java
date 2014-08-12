@@ -20,16 +20,17 @@ package com.kixeye.kixmpp.p2p.node;
  * #L%
  */
 
-import com.kixeye.kixmpp.p2p.ClusterClient;
-import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
-import com.kixeye.kixmpp.p2p.listener.ClusterListener;
-import com.kixeye.kixmpp.p2p.message.JoinRequest;
-import com.kixeye.kixmpp.p2p.message.JoinResponse;
-import com.kixeye.kixmpp.p2p.message.MessageRegistry;
-import com.kixeye.kixmpp.p2p.message.PingRequest;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.nio.NioEventLoopGroup;
+
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -38,14 +39,16 @@ import org.junit.runners.JUnit4;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Set;
-import java.util.concurrent.*;
+import com.kixeye.kixmpp.p2p.ClusterClient;
+import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
+import com.kixeye.kixmpp.p2p.listener.ClusterListener;
+import com.kixeye.kixmpp.p2p.message.JoinRequest;
+import com.kixeye.kixmpp.p2p.message.JoinResponse;
+import com.kixeye.kixmpp.p2p.message.MessageRegistry;
+import com.kixeye.kixmpp.p2p.message.PingRequest;
 
 @RunWith(JUnit4.class)
 public class NodeServerTest {
-
-    private final Logger logger = LoggerFactory.getLogger(NodeServerTest.class);
-
     @Before
     public void setup() {
         System.setProperty("io.netty.leakDetectionLevel","PARANOID");
