@@ -61,7 +61,7 @@ public class InMemoryMucService implements MucService {
             server.getEventEngine().publishTask( room.getRoomJid(), new Task() {
                 @Override
                 public void run() {
-                    tmp.receiveMessages(messages);
+                    tmp.receiveMessages(false, messages);
                 }
             });
         }

@@ -282,8 +282,8 @@ public class MucRoom {
      *
      * @param messages
      */
-    public void receiveMessages(String... messages) {
-        receiveMessages(roomJid, messages);
+    public void receiveMessages(boolean sendToCluster, String... messages) {
+        receiveMessages(roomJid, sendToCluster, messages);
     }
 
     /**
@@ -292,7 +292,7 @@ public class MucRoom {
      * @param fromAddress
      * @param messages
      */
-    public void receiveMessages(KixmppJid fromAddress, String... messages) {
+    public void receiveMessages(KixmppJid fromAddress, boolean sendToCluster, String... messages) {
         if (fromAddress == null) {
             return;
         }
@@ -303,7 +303,9 @@ public class MucRoom {
         for (User to : usersByNickname.values()) {
             to.receiveMessages(fromRoomJid, messages);
         }
-        server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, fromRoomJid, messages), false);
+        if (sendToCluster) {
+            server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, fromRoomJid, messages), false);
+        }
     }
 
     public void receive(KixmppJid fromAddress, String... messages) {
