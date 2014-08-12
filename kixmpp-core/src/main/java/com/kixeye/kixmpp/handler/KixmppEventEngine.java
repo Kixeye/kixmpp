@@ -102,14 +102,18 @@ public class KixmppEventEngine {
 	/**
 	 * Published an arbitrary task for serial execution.
 	 * 
-	 * @param address
+	 * @param jid
 	 * @param task
 	 */
 	public void publishTask(KixmppJid jid, Task task) {
 		DispatchQueue queue;
 		
 		try {
-			queue = queues.get("address:" + jid.getFullJid());
+            if (jid != null) {
+                queue = queues.get("address:" + jid.getFullJid());
+            } else {
+                queue = queues.get("default");
+            }
 		} catch (ExecutionException e) {
 			throw new RuntimeException(e);
 		}
