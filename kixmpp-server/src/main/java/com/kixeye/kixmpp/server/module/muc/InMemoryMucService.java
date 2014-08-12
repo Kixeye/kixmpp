@@ -24,9 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.fusesource.hawtdispatch.Task;
+
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.KixmppServer;
-import org.fusesource.hawtdispatch.Task;
 
 /**
  * A {@link MucService} that persists rooms in memory.
@@ -37,16 +38,16 @@ public class InMemoryMucService implements MucService {
 	private ConcurrentHashMap<String, MucRoom> rooms = new ConcurrentHashMap<>();
 
     private final KixmppServer server;
-	private final String serviceDomain;
+	private final String subDomain;
 
 	
 	/**
-	 * @param serviceDomain
+	 * @param server
+	 * @param subDomain
 	 */
-	public InMemoryMucService(KixmppServer server, String serviceDomain) {
-		serviceDomain = serviceDomain.toLowerCase();
+	public InMemoryMucService(KixmppServer server, String subDomain) {
 		this.server = server;
-		this.serviceDomain = serviceDomain;
+		this.subDomain = subDomain.toLowerCase();
 	}
 
     @Override
@@ -83,7 +84,7 @@ public class InMemoryMucService implements MucService {
         MucRoom mucRoom = rooms.get(name);
 
         if (mucRoom == null) {
-            mucRoom = new MucRoom(server, new KixmppJid(name,serviceDomain), options);
+            mucRoom = new MucRoom(this, new KixmppJid(name, subDomain + "." + server.getDomain()), options);
 
             MucRoom prevRoom = rooms.putIfAbsent(name, mucRoom);
 
@@ -102,5 +103,19 @@ public class InMemoryMucService implements MucService {
 		name = name.toLowerCase();
 		
 		return rooms.get(name);
+	}
+
+	/**
+	 * @return the server
+	 */
+	public KixmppServer getServer() {
+		return server;
+	}
+
+	/**
+	 * @return the subDomain
+	 */
+	public String getSubDomain() {
+		return subDomain;
 	}
 }

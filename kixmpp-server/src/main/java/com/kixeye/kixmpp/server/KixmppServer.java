@@ -40,6 +40,7 @@ import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 import com.kixeye.kixmpp.p2p.ClusterClient;
@@ -636,7 +637,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
         } else  if (message instanceof RoomTask) {
             RoomTask roomTask = (RoomTask) message;
             MucKixmppServerModule mucModule = module(MucKixmppServerModule.class);
-            MucService service = mucModule.getService(roomTask.getGameId());
+            MucService service = mucModule.getService(roomTask.getServiceSubDomain());
             if (service == null) {
                 return;
             }
