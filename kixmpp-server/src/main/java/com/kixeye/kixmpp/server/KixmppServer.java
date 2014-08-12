@@ -40,7 +40,6 @@ import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
-import com.kixeye.kixmpp.client.KixmppClient;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 import com.kixeye.kixmpp.p2p.ClusterClient;
