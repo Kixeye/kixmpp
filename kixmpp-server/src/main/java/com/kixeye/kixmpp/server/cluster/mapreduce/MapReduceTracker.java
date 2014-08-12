@@ -89,7 +89,7 @@ public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.R
     public void processResponse(MapReduceResponse response) {
         UUID transId = response.getTransactionId();
         RequestWrapper wrapper = requests.getIfPresent(transId);
-        wrapper.request.addResponse(response);
+        wrapper.request.mergeResponse(response);
         if (wrapper.pendingResponseCount.decrementAndGet() == 0) {
             requests.invalidate(transId);
             wrapper.request.onComplete(false);

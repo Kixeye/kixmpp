@@ -67,7 +67,7 @@ public abstract class MapReduceRequest extends ClusterTask {
         getKixmppServer().getCluster().sendMessage( getSenderId(), response );
     }
 
-    public abstract void addResponse(MapReduceResponse response);
+    public abstract void mergeResponse(MapReduceResponse response);
 
     public abstract void onComplete(boolean timedOut);
 
