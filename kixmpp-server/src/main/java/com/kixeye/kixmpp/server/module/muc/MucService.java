@@ -42,7 +42,7 @@ public interface MucService {
      * Broadcast the given messages to all rooms {@link MucRoom}.
      * @param messages
      */
-    public void broadcast(String...messages);
+    public void broadcast(KixmppJid jid, String...messages);
 
     /**
      * Adds a {@link MucRoom}.

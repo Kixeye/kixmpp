@@ -56,13 +56,13 @@ public class InMemoryMucService implements MucService {
     }
 
     @Override
-    public void broadcast(final String... messages) {
+    public void broadcast(final KixmppJid jid, final String... messages) {
         for(MucRoom room:rooms.values()){
             final MucRoom tmp = room;
             server.getEventEngine().publishTask( room.getRoomJid(), new Task() {
                 @Override
                 public void run() {
-                    tmp.receiveMessages(false, messages);
+                    tmp.receiveMessages(jid, false, messages);
                 }
             });
         }

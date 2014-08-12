@@ -312,16 +312,6 @@ public class MucRoom {
         return message;
     }
 
-
-    /**
-     * Broadcasts a message.
-     *
-     * @param messages
-     */
-    public void receiveMessages(boolean sendToCluster, String... messages) {
-        receiveMessages(roomJid, sendToCluster, messages);
-    }
-
     /**
      * Broadcasts a message using supplied nickname.
      *
