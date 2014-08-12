@@ -41,9 +41,8 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 public class MucRoomTest {
 	@Test
     public void joinRoom_firstTime_noMemberOnly() {
-        KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(false));
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().membersOnly(false));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -60,9 +59,9 @@ public class MucRoomTest {
 
     @Test
     public void joinRoom_multipleConnectionsSameUser_noMemberOnly() {
-        KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(false));
+        
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().membersOnly(false));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -89,9 +88,8 @@ public class MucRoomTest {
 
     @Test
     public void joinRoom_conflictingNickname_noMemberOnly() {
-        KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(false));
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().membersOnly(false));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -121,9 +119,8 @@ public class MucRoomTest {
 
     @Test(expected = MembersOnlyException.class)
     public void joinRoom_firstTime_memberOnly_noMemberAdded() {
-        KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(true));
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().membersOnly(true));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -136,9 +133,8 @@ public class MucRoomTest {
 
     @Test
     public void joinRoom_firstTime_memberOnly_memberAdded() {
-        KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(true));
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().membersOnly(true));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -156,18 +152,16 @@ public class MucRoomTest {
 
     @Test
     public void removeUser_userNotInRoom(){
-        KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(false));
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().membersOnly(false));
 
         Assert.assertFalse(mucRoom.removeUser(new KixmppJid("test.user","testdomain")));
     }
 
     @Test
     public void removeUser_userInRoom(){
-        KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(false));
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().membersOnly(false));
 
         KixmppJid clientJid = new KixmppJid("test.user", "testdomain", "testresource");
 
@@ -190,9 +184,8 @@ public class MucRoomTest {
 
     @Test
     public void removeAndRejoinUser(){
-        KixmppServer server = Mockito.mock(KixmppServer.class);
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(server, roomJid, new MucRoomSettings().membersOnly(true));
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().membersOnly(true));
 
         KixmppJid clientJid = new KixmppJid("test.user", "testdomain", "testresource");
 

@@ -22,6 +22,8 @@ package com.kixeye.kixmpp.server.module.muc;
 
 import java.util.List;
 
+import com.kixeye.kixmpp.server.KixmppServer;
+
 /**
  * A service that handles MUCs.
  * 
@@ -64,4 +66,17 @@ public interface MucService {
 	 * @return
 	 */
 	public MucRoom getRoom(String name);
+	
+	/**
+	 * Returns the server that owns this service.
+	 * @return
+	 */
+	public KixmppServer getServer();
+	
+	/**
+	 * Returns the subdomain for this service.
+	 * 
+	 * @return
+	 */
+	public String getSubDomain();
 }

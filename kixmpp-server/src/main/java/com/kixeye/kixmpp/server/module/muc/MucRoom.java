@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 import org.jdom2.Element;
 import org.jdom2.Namespace;
@@ -38,7 +37,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.date.XmppDateUtils;
-import com.kixeye.kixmpp.server.KixmppServer;
 import com.kixeye.kixmpp.server.cluster.message.RoomBroadcastTask;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
@@ -48,10 +46,9 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
  * @author ebahtijaragic
  */
 public class MucRoom {
-    private final KixmppServer server;
+    private final MucService service;
     private final KixmppJid roomJid;
     private final MucKixmppServerModule mucModule;
-    private final String gameId;
     private final String roomId;
     private final MucRoomSettings settings;
 
@@ -59,16 +56,15 @@ public class MucRoom {
     private Map<String, User> usersByNickname = new HashMap<>();
     
     /**
-     * @param server
+     * @param service
      * @param roomJid
      * @param settings
      */
-    public MucRoom(KixmppServer server, KixmppJid roomJid, MucRoomSettings settings) {
-        this.server = server;
+    public MucRoom(MucService service, KixmppJid roomJid, MucRoomSettings settings) {
+        this.service = service;
         this.roomJid = roomJid;
-        this.gameId = roomJid.getDomain().split(Pattern.quote("."))[0];
         this.roomId = roomJid.getNode();
-        this.mucModule = server.module(MucKixmppServerModule.class);
+        this.mucModule = service.getServer().module(MucKixmppServerModule.class);
         this.settings = new MucRoomSettings(settings);
     }
 
@@ -303,8 +299,9 @@ public class MucRoom {
         for (User to : usersByNickname.values()) {
             to.receiveMessages(fromRoomJid, messages);
         }
+        
         if (sendToCluster) {
-            server.getCluster().sendMessageToAll(new RoomBroadcastTask(this, gameId, roomId, fromRoomJid, messages), false);
+            service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromRoomJid, messages), false);
         }
     }
 

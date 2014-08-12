@@ -27,15 +27,15 @@ public abstract class RoomTask extends ClusterTask {
 
     private transient MucRoom room;
 
-    private String gameId;
+    private String serviceSubDomain;
     private String roomId;
 
     public RoomTask() {
     }
 
-    protected RoomTask(MucRoom room, String gameId, String roomId) {
+    protected RoomTask(MucRoom room, String serviceSubDomain, String roomId) {
         this.room = room;
-        this.gameId = gameId;
+        this.serviceSubDomain = serviceSubDomain;
         this.roomId = roomId;
     }
 
@@ -47,8 +47,8 @@ public abstract class RoomTask extends ClusterTask {
         return room;
     }
 
-    public String getGameId() {
-        return gameId;
+    public String getServiceSubDomain() {
+        return serviceSubDomain;
     }
 
     public String getRoomId() {
