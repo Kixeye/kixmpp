@@ -24,14 +24,14 @@ import com.kixeye.kixmpp.KixmppException;
 import com.kixeye.kixmpp.KixmppJid;
 
 /**
- * A user attempted to join a members-only MUC room for which they are not a member.
+ * A user attempted to join a MUC room for which they are not allowed.
  *
  * @author dturner@kixeye.com
  */
-public class MembersOnlyException extends KixmppException {
+public class RoomJoinNotAllowedException extends KixmppException {
 	private static final long serialVersionUID = 8605187410416156957L;
 
-	public MembersOnlyException(MucRoom mucRoom, KixmppJid jid) {
-        super(jid + " cannot join room " + mucRoom.getRoomJid() + " because they are not a member and the room is members only.");
+	public RoomJoinNotAllowedException(MucRoom mucRoom, KixmppJid jid) {
+        super(jid + " cannot join room " + mucRoom.getRoomJid() + " because they are not allowed.");
     }
 }

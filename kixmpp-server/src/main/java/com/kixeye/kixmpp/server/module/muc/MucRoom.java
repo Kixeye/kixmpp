@@ -52,7 +52,10 @@ public class MucRoom {
     private final String roomId;
     private final MucRoomSettings settings;
 
-    private HashMap<KixmppJid, String> memberNicknamesByBareJid = new HashMap<>();
+    private Map<KixmppJid, MucRole> jidRoles = new HashMap<>();
+    private Map<KixmppJid, MucAffiliation> jidAffiliations = new HashMap<>();
+    
+    private Map<KixmppJid, String> nicknamesByBareJid = new HashMap<>();
     private Map<String, User> usersByNickname = new HashMap<>();
     
     /**
@@ -77,10 +80,21 @@ public class MucRoom {
         return roomJid;
     }
 
-    public void addMember(KixmppJid jid, String nickname) {
+    /**
+     * Adds a user.
+     * 
+     * @param jid
+     * @param nickname
+     * @param role
+     * @param affiliation
+     */
+    public void addUser(KixmppJid jid, String nickname, MucRole role, MucAffiliation affiliation) {
         jid = jid.withoutResource();
         checkForNicknameInUse(nickname, jid);
-        memberNicknamesByBareJid.put(jid, nickname);
+
+        nicknamesByBareJid.put(jid, nickname);
+        jidRoles.put(jid, role);
+        jidAffiliations.put(jid, affiliation);
     }
     
     /**
@@ -102,10 +116,12 @@ public class MucRoom {
     public void join(Channel channel, String nickname, Element mucStanza) {
         KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
 
-        checkForMemberOnly(jid);
+        if (settings.isOpen() && !jidRoles.containsKey(jid.withoutResource())) {
+        	addUser(jid, nickname, MucRole.Participant, MucAffiliation.Member);
+        }
+        
+        verifyMembership(jid.withoutResource());
         checkForNicknameInUse(nickname, jid);
-
-        addMember(jid, nickname);
 
         User user = usersByNickname.get(nickname);
 
@@ -213,13 +229,37 @@ public class MucRoom {
         }
     }
 
-    private void checkForMemberOnly(KixmppJid jid) {
-        if (settings.isMembersOnly()) {
-            if (memberNicknamesByBareJid.containsKey(jid.withoutResource())) {
-                return;
-            }
-            throw new MembersOnlyException(this, jid);
-        }
+    private void verifyMembership(KixmppJid jid) {
+    	MucAffiliation affiliation = jidAffiliations.get(jid);
+    	
+    	if (affiliation == null) {
+            throw new RoomJoinNotAllowedException(this, jid);
+    	}
+    	
+    	MucRole role = jidRoles.get(jid);
+    	
+    	if (role == null) {
+    		switch (affiliation) {
+				case Owner:
+				case Admin:
+					role = MucRole.Moderator;
+					break;
+				case Member:
+					role = MucRole.Participant;
+					break;
+				case None:
+					role = MucRole.Visitor;
+					break;
+				case Outcast:
+		            throw new RoomJoinNotAllowedException(this, jid);
+				default:
+					role = MucRole.None;
+					break;
+    		}
+    	}
+    	
+    	jidRoles.put(jid, role);
+    	jidAffiliations.put(jid, affiliation);
     }
 
     /**
@@ -230,7 +270,7 @@ public class MucRoom {
      * @return
      */
     public boolean removeUser(KixmppJid address) {
-        String nickname = memberNicknamesByBareJid.get(address.withoutResource());
+        String nickname = nicknamesByBareJid.get(address.withoutResource());
         if (nickname == null) {
             //user is not in the room
             return false;
@@ -292,12 +332,39 @@ public class MucRoom {
         if (fromAddress == null) {
             return;
         }
-        String fromNickname = memberNicknamesByBareJid.get(fromAddress.withoutResource());
+        
+        MucRole fromRole = jidRoles.get(fromAddress.withoutResource());
+        
+        if (fromRole == null) {
+        	removeUser(fromAddress);
+        	return;
+        }
+        
+        switch (fromRole) {
+			case None:
+			case Visitor:
+				// TODO maybe send back and error?
+				return;
+			default:
+				break;
+        }
+        
+        String fromNickname = nicknamesByBareJid.get(fromAddress.withoutResource());
         //TODO validate fromAddress is roomJid or is a member of the room
         KixmppJid fromRoomJid = roomJid.withoutResource().withResource(fromNickname);
 
         for (User to : usersByNickname.values()) {
-            to.receiveMessages(fromRoomJid, messages);
+            MucRole toRole = jidRoles.get(to.bareJid.withoutResource());
+            
+        	switch (toRole) {
+	        	case Participant:
+	        	case Moderator:
+	            	to.receiveMessages(fromRoomJid, messages);
+	            	break;
+	            default:
+	            	// TODO maybe send error?
+	            	break;
+        	}
         }
         
         if (sendToCluster) {

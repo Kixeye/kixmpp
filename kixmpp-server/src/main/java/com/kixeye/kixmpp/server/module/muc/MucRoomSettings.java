@@ -27,18 +27,18 @@ package com.kixeye.kixmpp.server.module.muc;
  */
 public class MucRoomSettings {
 
-    private boolean membersOnly = false;
+    private boolean isOpen = true;
     private String subject = null;
 
     public MucRoomSettings(MucRoomSettings settings) {
-        membersOnly = settings.isMembersOnly();
+    	isOpen = settings.isOpen();
     }
 
     public MucRoomSettings() {
     }
 
-    public MucRoomSettings membersOnly(boolean membersOnly){
-        this.membersOnly = membersOnly;
+    public MucRoomSettings isOpen(boolean isOpen){
+        this.isOpen = isOpen;
         return this;
     }
 
@@ -47,8 +47,8 @@ public class MucRoomSettings {
         return this;
     }
 
-    public boolean isMembersOnly() {
-        return membersOnly;
+    public boolean isOpen() {
+        return isOpen;
     }
 
     public String getSubject() {
