@@ -249,9 +249,9 @@ public class MucKixmppClientModule implements KixmppClientModule {
 					// check if invite
 					for (Element invitation : stanza.getChildren("x", Namespace.getNamespace("jabber:x:conference"))) {
 						KixmppJid roomJid = KixmppJid.fromRawJid(invitation.getAttributeValue("jid"));
-						
-						MucInvite invite = new MucInvite(KixmppJid.fromRawJid(stanza.getAttributeValue("from")), KixmppJid.fromRawJid(stanza.getAttributeValue("to")), roomJid);
-						
+                        KixmppJid toJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
+                        KixmppJid fromJid = KixmppJid.fromRawJid(stanza.getAttributeValue("from"));
+						MucInvite invite = new MucInvite(fromJid, toJid, roomJid);
 						for (MucListener<MucInvite> listener : invitationListeners) {
 							try {
 								listener.handle(invite);
@@ -260,6 +260,21 @@ public class MucKixmppClientModule implements KixmppClientModule {
 							}
 						}
 					}
+                    for (Element x : stanza.getChildren("x",  Namespace.getNamespace("http://jabber.org/protocol/muc#user"))) {
+                        for (Element i : x.getChildren("invite")) {
+                            KixmppJid roomJid = KixmppJid.fromRawJid( stanza.getAttributeValue("from"));
+                            KixmppJid toJid =  KixmppJid.fromRawJid( stanza.getAttributeValue("to"));
+                            KixmppJid fromJid = KixmppJid.fromRawJid( i.getAttributeValue("from"));
+                            MucInvite invite = new MucInvite(fromJid,toJid,roomJid);
+                            for (MucListener<MucInvite> listener : invitationListeners) {
+                                try {
+                                    listener.handle(invite);
+                                } catch (Exception e) {
+                                    logger.error("Exception thrown while executing MucInvite listener", e);
+                                }
+                            }
+                        }
+                    }
 					break;
 			}
 		}
