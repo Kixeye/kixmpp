@@ -369,9 +369,9 @@ public class MucRoom {
     }
 
     /**
-     * Sends an invitation for a user.
+     * Sends an direct invitation to a user.  Note: The smack client does not recognize this as a valid room invite.
      */
-    public void sendInvite(KixmppJid from, Channel userChannelToInvite, String reason) {
+    public void sendDirectInvite(KixmppJid from, Channel userChannelToInvite, String reason) {
         Element message = new Element("message");
         message.setAttribute("to", userChannelToInvite.attr(BindKixmppServerModule.JID).get().getFullJid());
         if (from != null) {
@@ -384,6 +384,30 @@ public class MucRoom {
             x.setAttribute("reason", reason);
         }
 
+        message.addContent(x);
+
+        userChannelToInvite.writeAndFlush(message);
+    }
+
+    /**
+     * Sends a mediated invitation to a user.
+     */
+    public void sendMediatedInvite(KixmppJid from, Channel userChannelToInvite, String reason) {
+
+        Element invite = new Element("invite");
+        invite.setAttribute("from", from.getFullJid());
+        if (reason != null) {
+            Element el = new Element("reason");
+            el.setText(reason);
+            invite.addContent(el);
+        }
+
+        Element x = new Element("x", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
+        x.addContent(invite);
+
+        Element message = new Element("message");
+        message.setAttribute("to", userChannelToInvite.attr(BindKixmppServerModule.JID).get().getFullJid());
+        message.setAttribute("from", roomJid.getFullJid());
         message.addContent(x);
 
         userChannelToInvite.writeAndFlush(message);
