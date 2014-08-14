@@ -222,6 +222,29 @@ public class MucRoom {
         channel.closeFuture().addListener(new CloseChannelListener(client));
     }
 
+    /**
+     * Remove the {@link User} associated with the given {@link KixmppJid} from the
+     * room.  This will remove all {@link Client}s associated with the {@link User}.
+     *
+     * @param address
+     * @return
+     */
+    public boolean removeUser(KixmppJid address) {
+        String nickname = nicknamesByBareJid.get(address.withoutResource());
+        if (nickname == null) {
+            //user is not in the room
+            return false;
+        }
+        User user = usersByNickname.get(nickname);
+        if (user == null) {
+            //user is no longer connected to the room
+            return false;
+        }
+        user.removeClients();
+        removeDisconnectedUser(user);
+        return true;
+    }
+    
     private void checkForNicknameInUse(String nickname, KixmppJid jid) {
         User user = usersByNickname.get(nickname);
         if (user != null && !user.getBareJid().equals(jid.withoutResource())) {
@@ -260,29 +283,6 @@ public class MucRoom {
     	
     	jidRoles.put(jid, role);
     	jidAffiliations.put(jid, affiliation);
-    }
-
-    /**
-     * Remove the {@link User} associated with the given {@link KixmppJid} from the
-     * room.  This will remove all {@link Client}s associated with the {@link User}.
-     *
-     * @param address
-     * @return
-     */
-    public boolean removeUser(KixmppJid address) {
-        String nickname = nicknamesByBareJid.get(address.withoutResource());
-        if (nickname == null) {
-            //user is not in the room
-            return false;
-        }
-        User user = usersByNickname.get(nickname);
-        if (user == null) {
-            //user is no longer connected to the room
-            return false;
-        }
-        user.removeClients();
-        removeDisconnectedUser(user);
-        return true;
     }
 
     /**
