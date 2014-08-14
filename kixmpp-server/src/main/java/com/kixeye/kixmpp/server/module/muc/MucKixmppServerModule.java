@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.fusesource.hawtdispatch.Task;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 
@@ -146,7 +147,8 @@ public class MucKixmppServerModule implements KixmppServerModule {
 					MucRoom room = service.getRoom(fullRoomJid.getNode());
 					
 					if (room != null) {
-						room.join(channel, fullRoomJid.getResource(), x);
+                        server.getEventEngine().publishTask(room.getRoomJid(), 
+                        		new JoinRoomTask(channel, room, fullRoomJid.getResource(), x));
 					} // TODO handle else
 				} // TODO handle else
 			}
@@ -168,10 +170,46 @@ public class MucKixmppServerModule implements KixmppServerModule {
 
 					if (room != null) {
                         Element body = stanza.getChild("body", stanza.getNamespace());
-                        room.receiveMessages(channel.attr(BindKixmppServerModule.JID).get(), true, body.getText());
+                        
+                        server.getEventEngine().publishTask(room.getRoomJid(), 
+                        		new ReceiveMessageTask(channel.attr(BindKixmppServerModule.JID).get(), room, body.getText()));
 					} // TODO handle else
 				} // TODO handle else
 			}
 		}
 	};
+	
+	private static class JoinRoomTask extends Task {
+		private final Channel channel;
+		private final MucRoom room;
+		private final String nickname;
+		private final Element x;
+
+		public JoinRoomTask(Channel channel, MucRoom room, String nickname, Element x) {
+			this.channel = channel;
+			this.room = room;
+			this.nickname = nickname;
+			this.x = x;
+		}
+
+		public void run() {
+			room.join(channel, nickname, x);
+		}
+	}
+	
+	private static class ReceiveMessageTask extends Task {
+		private final KixmppJid sender;
+		private final MucRoom room;
+		private final String body;
+		
+		public ReceiveMessageTask(KixmppJid sender, MucRoom room, String body) {
+			this.sender = sender;
+			this.room = room;
+			this.body = body;
+		}
+
+		public void run() {
+            room.receiveMessages(sender, true, body);
+		}
+	}
 }
