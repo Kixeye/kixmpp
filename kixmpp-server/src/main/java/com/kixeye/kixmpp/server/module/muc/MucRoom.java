@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.fusesource.hawtdispatch.Task;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 
@@ -428,6 +429,12 @@ public class MucRoom {
         return clients;
     }
 
+    private void removeDisconnectedUser(User user) {
+        if (user.getClientCount() == 0) {
+            this.usersByNickname.remove(user.getNickname());
+        }
+    }
+    
     private class CloseChannelListener implements GenericFutureListener<Future<? super Void>> {
         private final Client client;
 
@@ -439,14 +446,22 @@ public class MucRoom {
         }
 
         public void operationComplete(Future<? super Void> future) throws Exception {
-            leave(client);
+             service.getServer().getEventEngine().publishTask(roomJid, new LeaveRoomTask(MucRoom.this, client));
         }
     }
 
-    private void removeDisconnectedUser(User user) {
-        if (user.getClientCount() == 0) {
-            this.usersByNickname.remove(user.getNickname());
-        }
+    private static class LeaveRoomTask extends Task {
+    	private final MucRoom room;
+    	private final Client client;
+    	
+		public LeaveRoomTask(MucRoom room, Client client) {
+			this.room = room;
+			this.client = client;
+		}
+
+		public void run() {
+			room.leave(client);
+		}
     }
 
     /**
