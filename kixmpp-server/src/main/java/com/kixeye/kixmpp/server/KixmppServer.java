@@ -158,7 +158,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	}
 	
 	/**
-	 * Creates a new {@link KixmppClient}.
+	 * Creates a new {@link KixmppServer}.
 	 * 
 	 * @param workerGroup
 	 * @param eventEngine
@@ -635,8 +635,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
             mapReduce.processResponse(response);
         } else  if (message instanceof RoomTask) {
             RoomTask roomTask = (RoomTask) message;
-            MucKixmppServerModule mucModule = module(MucKixmppServerModule.class);
-            MucService service = mucModule.getService(roomTask.getServiceSubDomain());
+            MucService service = module(MucKixmppServerModule.class).getService(roomTask.getServiceSubDomain());
             if (service == null) {
                 return;
             }
