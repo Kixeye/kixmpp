@@ -20,20 +20,10 @@ package com.kixeye.kixmpp.p2p;
  * #L%
  */
 
-import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
-import com.kixeye.kixmpp.p2p.listener.ClusterListener;
-import com.kixeye.kixmpp.p2p.message.JoinRequest;
-import com.kixeye.kixmpp.p2p.message.JoinResponse;
-import com.kixeye.kixmpp.p2p.message.MessageRegistry;
-import com.kixeye.kixmpp.p2p.message.MessageWrapper;
-import com.kixeye.kixmpp.p2p.node.*;
-import com.kixeye.kixmpp.p2p.util.Net;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.nio.NioEventLoopGroup;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -42,6 +32,23 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
+import com.kixeye.kixmpp.p2p.listener.ClusterListener;
+import com.kixeye.kixmpp.p2p.message.JoinRequest;
+import com.kixeye.kixmpp.p2p.message.JoinResponse;
+import com.kixeye.kixmpp.p2p.message.MessageRegistry;
+import com.kixeye.kixmpp.p2p.message.MessageWrapper;
+import com.kixeye.kixmpp.p2p.node.LocalNode;
+import com.kixeye.kixmpp.p2p.node.Node;
+import com.kixeye.kixmpp.p2p.node.NodeAddress;
+import com.kixeye.kixmpp.p2p.node.NodeId;
+import com.kixeye.kixmpp.p2p.node.NodeServer;
+import com.kixeye.kixmpp.p2p.node.RemoteNode;
+import com.kixeye.kixmpp.p2p.util.Net;
 
 /**
  * ClusterClient maintains a list of Zaqar peer-to-peer connections.

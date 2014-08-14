@@ -71,11 +71,15 @@ public class NodeServer {
 
         // start accepting connection
         try {
+    		logger.info("Starting NodeServer on [{}]...", port);
+    		
             if (host == null) {
                 acceptChannel = boot.bind(port).sync().channel();
             } else {
                 acceptChannel = boot.bind(host, port).sync().channel();
             }
+
+    		logger.info("NodeServer listening on [{}]...", port);
         } catch (InterruptedException e) {
             logger.error("Binding to port {} failed", port, e);
         }
