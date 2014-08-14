@@ -292,8 +292,11 @@ public class MucRoom {
      */
     private void leave(Client client) {
         User user = usersByNickname.get(client.getNickname());
-        user.removeClient(client);
-        removeDisconnectedUser(user);
+        
+        if (user != null) {
+	        user.removeClient(client);
+	        removeDisconnectedUser(user);
+        }
     }
 
     private Element createMessage(String id, KixmppJid from, KixmppJid to, String type, String bodyText) {
