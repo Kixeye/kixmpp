@@ -310,7 +310,7 @@ public class ClusterClient {
                 // Handle join request
                 synchronized (joinLock) {
                     if (joinRequest.getJoinerAddress().equals(localNode.getAddress())) {
-                        logger.error("Received join for myself? Local address: {} - Joiner address: {}", localNode.getAddress(), joinRequest.getJoinerAddress());
+                        logger.error("Received join for myself? Local address: [{}] - Joiner address: [{}]", localNode.getAddress(), joinRequest.getJoinerAddress());
                         return;
                     }
 
