@@ -328,7 +328,7 @@ public class KixmppClient implements AutoCloseable {
      */
     @SuppressWarnings("unchecked")
 	public <T extends KixmppClientModule> T module(Class<T> moduleClass) {
-    	if (!(state.get() == State.CONNECTED || state.get() == State.LOGGED_IN)) {
+    	if (!(state.get() == State.CONNECTED || state.get() == State.LOGGING_IN || state.get() == State.SECURING || state.get() == State.LOGGED_IN)) {
 			throw new IllegalStateException(String.format("The current state is [%s] but must be [CONNECTED or LOGGED_IN]", state.get()));
     	}
     	
