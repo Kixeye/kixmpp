@@ -394,6 +394,15 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
     }
     
     /**
+     * Gets the number of channels.
+     * 
+     * @return
+     */
+    public int getChannelCount() {
+    	return jidChannel.size();
+    }
+    
+    /**
      * Gets a channel that is assigned to this JID.
      * 
      * @param jid
