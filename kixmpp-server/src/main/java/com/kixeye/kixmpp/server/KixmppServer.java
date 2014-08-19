@@ -9,11 +9,13 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.GlobalEventExecutor;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
@@ -112,6 +114,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	private final AtomicReference<Channel> channel = new AtomicReference<>();
 	private AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
 	
+	private final DefaultChannelGroup channels;
 	private final ConcurrentHashMap<KixmppJid, Channel> jidChannel = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<String, Set<Channel>> usernameChannel = new ConcurrentHashMap<>();
 	private final Striped<Lock> usernameChannelStripes = Striped.lock(Runtime.getRuntime().availableProcessors() * 4);
@@ -166,7 +169,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 * @param domain
 	 */
 	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, KixmppEventEngine eventEngine, InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery) {
-		bootstrap = new ServerBootstrap()
+		this.bootstrap = new ServerBootstrap()
 			.group(bossGroup, workerGroup)
 			.channel(NioServerSocketChannel.class)
 			.childHandler(new ChannelInitializer<SocketChannel>() {
@@ -176,10 +179,11 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 				}
 			});
 
-        scheduledExecutorService = Executors.newScheduledThreadPool( Runtime.getRuntime().availableProcessors() );
-        cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, scheduledExecutorService );
-        cluster.getMessageRegistry().addCustomMessage(1, RoomBroadcastTask.class);
-        mapReduce = new MapReduceTracker(this, scheduledExecutorService);
+		this.scheduledExecutorService = Executors.newScheduledThreadPool( Runtime.getRuntime().availableProcessors() );
+        this.cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, scheduledExecutorService );
+        this.cluster.getMessageRegistry().addCustomMessage(1, RoomBroadcastTask.class);
+        this.mapReduce = new MapReduceTracker(this, scheduledExecutorService);
+        this.channels = new DefaultChannelGroup("All Channels", GlobalEventExecutor.INSTANCE);
 
 		this.bindAddress = bindAddress;
 		this.domain = domain.toLowerCase();
@@ -399,7 +403,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
      * @return
      */
     public int getChannelCount() {
-    	return jidChannel.size();
+    	return channels.size();
     }
     
     /**
@@ -572,12 +576,16 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		public void channelActive(ChannelHandlerContext ctx) throws Exception {
 			logger.debug("Channel [{}] connected.", ctx.channel());
 			
+			channels.add(ctx.channel());
+			
 			eventEngine.publishConnected(ctx.channel());
 		}
 		
 		@Override
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 			logger.debug("Channel [{}] disconnected.", ctx.channel());
+			
+			channels.remove(ctx.channel());
 
 			KixmppJid jid = ctx.channel().attr(BindKixmppServerModule.JID).get();
 			
