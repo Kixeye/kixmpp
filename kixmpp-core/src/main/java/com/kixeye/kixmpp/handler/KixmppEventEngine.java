@@ -42,7 +42,7 @@ import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.tuple.Tuple;
 
 /**
- * A stanza handler that uses {@link Reactor}.
+ * An event engine that uses a {@link DispatchQueue}.
  * 
  * @author ebahtijaragic
  */
@@ -225,7 +225,6 @@ public class KixmppEventEngine {
 	public void registerConnectionHandler(KixmppConnectionHandler handler) {
 		connectionHandlers.add(handler);
 	}
-	
 
 	/**
 	 * Unregisters a connection handler.
