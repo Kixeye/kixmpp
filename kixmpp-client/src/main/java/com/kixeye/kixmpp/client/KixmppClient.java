@@ -205,8 +205,9 @@ public class KixmppClient implements AutoCloseable {
 	 */
 	public ListenableFuture<KixmppClient> login(String username, String password, String resource) throws InterruptedException {
 		checkAndSetState(State.LOGGING_IN, State.CONNECTED);
-		
+
 		this.jid = this.jid.withNode(username).withResource(resource);
+		this.password = password;
 		
 		KixmppCodec.sendXmppStreamRootStart(channel.get(), null, jid.getDomain());
 		
