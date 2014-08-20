@@ -669,6 +669,13 @@ public class KixmppClient implements AutoCloseable {
 		}
 		
 		@Override
+		public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+			logger.error("Unexpected error", cause);
+			
+			KixmppClient.this.close();
+		}
+		
+		@Override
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 			KixmppClient.this.disconnect();
 		}
