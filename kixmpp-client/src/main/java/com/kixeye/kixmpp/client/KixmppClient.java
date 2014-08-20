@@ -66,6 +66,7 @@ import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.client.module.KixmppClientModule;
+import com.kixeye.kixmpp.client.module.chat.MessageKixmppClientModule;
 import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
@@ -157,6 +158,7 @@ public class KixmppClient implements AutoCloseable {
 		// set modules to be registered
 		this.modulesToRegister.add(MucKixmppClientModule.class.getName());
 		this.modulesToRegister.add(PresenceKixmppClientModule.class.getName());
+		this.modulesToRegister.add(MessageKixmppClientModule.class.getName());
 	}
 	
 	/**

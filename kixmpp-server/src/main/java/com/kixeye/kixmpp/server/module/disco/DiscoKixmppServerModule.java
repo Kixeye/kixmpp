@@ -32,7 +32,7 @@ import com.kixeye.kixmpp.server.KixmppServer;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 
 /**
- * Handles roster features.
+ * Handles disco features.
  * 
  * @author ebahtijaragic
  */

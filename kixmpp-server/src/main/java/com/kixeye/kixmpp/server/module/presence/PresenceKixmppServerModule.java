@@ -34,7 +34,7 @@ import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
 /**
- * Handles MUC features.
+ * Handles presence features.
  * 
  * @author ebahtijaragic
  */

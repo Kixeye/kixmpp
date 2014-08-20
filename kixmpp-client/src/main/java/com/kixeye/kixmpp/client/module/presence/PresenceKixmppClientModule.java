@@ -55,7 +55,7 @@ public class PresenceKixmppClientModule implements KixmppClientModule {
 	}
 
 	/**
-	 * @param listener the listener to add
+	 * @param listener the listener to remove
 	 */
 	public void removePresenceListener(PresenceListener listener) {
 		presenceListeners.remove(listener);

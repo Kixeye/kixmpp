@@ -24,6 +24,7 @@ import io.netty.handler.ssl.SslContext;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -40,6 +41,8 @@ import org.junit.Test;
 
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.client.KixmppClient;
+import com.kixeye.kixmpp.client.module.chat.MessageKixmppClientModule;
+import com.kixeye.kixmpp.client.module.chat.MessageListener;
 import com.kixeye.kixmpp.client.module.muc.MucJoin;
 import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
 import com.kixeye.kixmpp.client.module.muc.MucListener;
@@ -112,6 +115,81 @@ public class KixmppServerTest {
 			}
 
 			Assert.assertNull(server.getChannel(KixmppJid.fromRawJid("testUser@testchat/testResource")));
+		}
+	}
+	
+	@Test
+	public void testPrivateMessageUsingKixmpp() throws Exception {
+		try (KixmppServer server = new KixmppServer("testChat")) {
+			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
+
+			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser1", "testPassword");
+			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser2", "testPassword");
+			
+			try (KixmppClient client1 = new KixmppClient()) {
+				final LinkedBlockingQueue<Presence> client1Presences = new LinkedBlockingQueue<>();
+				final LinkedBlockingQueue<com.kixeye.kixmpp.client.module.chat.Message> client1Messages = new LinkedBlockingQueue<>();
+
+				Assert.assertNotNull(client1.connect("localhost",
+						server.getBindAddress().getPort(), server.getDomain())
+						.get(2, TimeUnit.SECONDS));
+
+				client1.module(PresenceKixmppClientModule.class)
+						.addPresenceListener(new PresenceListener() {
+							public void handle(Presence presence) {
+								client1Presences.offer(presence);
+							}
+						});
+				client1.module(MessageKixmppClientModule.class)
+						.addMessageListener(new MessageListener() {
+							public void handle(com.kixeye.kixmpp.client.module.chat.Message message) {
+								client1Messages.offer(message);
+							}
+						});
+
+				Assert.assertNotNull(client1.login("testUser1", "testPassword", "testResource").get(2, TimeUnit.SECONDS));
+				client1.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
+
+				Assert.assertNotNull(client1Presences.poll(2, TimeUnit.SECONDS));
+				
+				try (KixmppClient client2 = new KixmppClient()) {
+					final LinkedBlockingQueue<Presence> client2Presences = new LinkedBlockingQueue<>();
+					final LinkedBlockingQueue<com.kixeye.kixmpp.client.module.chat.Message> client2Messages = new LinkedBlockingQueue<>();
+
+					Assert.assertNotNull(client2.connect("localhost",
+							server.getBindAddress().getPort(), server.getDomain())
+							.get(2, TimeUnit.SECONDS));
+
+					client2.module(PresenceKixmppClientModule.class)
+							.addPresenceListener(new PresenceListener() {
+								public void handle(Presence presence) {
+									client2Presences.offer(presence);
+								}
+							});
+					client2.module(MessageKixmppClientModule.class)
+							.addMessageListener(new MessageListener() {
+								public void handle(com.kixeye.kixmpp.client.module.chat.Message message) {
+									client2Messages.offer(message);
+								}
+							});
+
+					Assert.assertNotNull(client2.login("testUser2", "testPassword", "testResource").get(2, TimeUnit.SECONDS));
+					client2.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
+
+					Assert.assertNotNull(client2Presences.poll(2, TimeUnit.SECONDS));
+
+					final String body = UUID.randomUUID().toString().replace("-", "");
+					
+					client2.module(MessageKixmppClientModule.class).sendMessage(client1.getJid(), body);
+					
+					com.kixeye.kixmpp.client.module.chat.Message client1Message = client1Messages.poll(2, TimeUnit.SECONDS);
+					
+					Assert.assertNotNull(client1Message);
+					Assert.assertEquals(client2.getJid(), client1Message.getFrom());
+					Assert.assertEquals(client1.getJid().getBaseJid(), client1Message.getTo().getFullJid());
+					Assert.assertEquals(body, client1Message.getBody());
+				}
+			}
 		}
 	}
 
