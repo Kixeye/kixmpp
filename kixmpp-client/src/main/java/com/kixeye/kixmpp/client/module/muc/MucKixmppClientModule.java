@@ -227,7 +227,7 @@ public class MucKixmppClientModule implements KixmppClientModule {
 					String language = null;
 					String bodyMessage = null;
 					
-					Element body = stanza.getChild("body", Namespace.getNamespace("jabber:client"));
+					Element body = stanza.getChild("body", stanza.getNamespace());
 					
 					if (body != null) {
 						bodyMessage = body.getText();

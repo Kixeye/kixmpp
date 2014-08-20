@@ -111,8 +111,8 @@ public class PresenceKixmppClientModule implements KixmppClientModule {
 			Presence presence = new Presence(KixmppJid.fromRawJid(stanza.getAttributeValue("from")), 
 					KixmppJid.fromRawJid(stanza.getAttributeValue("to")), 
 					stanza.getAttributeValue("type"), 
-					stanza.getChildText("status"), 
-					stanza.getChildText("show"));
+					stanza.getChildText("status", stanza.getNamespace()), 
+					stanza.getChildText("show", stanza.getNamespace()));
 			
 			for (PresenceListener listener : presenceListeners) {
 				try {
