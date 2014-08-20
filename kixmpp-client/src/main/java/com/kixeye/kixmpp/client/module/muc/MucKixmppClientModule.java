@@ -102,7 +102,7 @@ public class MucKixmppClientModule implements KixmppClientModule {
 	 */
 	public void joinRoom(KixmppJid roomJid, String nickname, Integer maxStanzas, Integer maxChars, Integer seconds, DateTime since) {
 		Element presence = new Element("presence");
-		presence.setAttribute("from", client.getJid());
+		presence.setAttribute("from", client.getJid().getFullJid());
 		presence.setAttribute("to", roomJid + "/" + nickname);
 
 		Element x = new Element("x", "http://jabber.org/protocol/muc");

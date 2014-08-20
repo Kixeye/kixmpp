@@ -60,6 +60,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.kixeye.kixmpp.KixmppAuthException;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppException;
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
@@ -93,12 +94,9 @@ public class KixmppClient implements AutoCloseable {
 	
 	private SettableFuture<KixmppClient> deferredLogin;
 	private SettableFuture<KixmppClient> deferredDisconnect;
-	
-	private String username;
+
+	private KixmppJid jid;
 	private String password;
-	private String resource;
-	private String domain;
-	private String jid;
 	
 	private AtomicReference<Channel> channel = new AtomicReference<>(null);
 	
@@ -170,7 +168,7 @@ public class KixmppClient implements AutoCloseable {
 	public ListenableFuture<KixmppClient> connect(String hostname, int port, String domain) {
 		checkAndSetState(State.CONNECTING, State.DISCONNECTED);
 		
-		this.domain = domain;
+		this.jid = new KixmppJid(domain);
 		
 		setUp();
 		
@@ -208,11 +206,9 @@ public class KixmppClient implements AutoCloseable {
 	public ListenableFuture<KixmppClient> login(String username, String password, String resource) throws InterruptedException {
 		checkAndSetState(State.LOGGING_IN, State.CONNECTED);
 		
-		this.username = username;
-		this.password = password;
-		this.resource = resource;
+		this.jid = this.jid.withNode(username).withResource(resource);
 		
-		KixmppCodec.sendXmppStreamRootStart(channel.get(), null, domain);
+		KixmppCodec.sendXmppStreamRootStart(channel.get(), null, jid.getDomain());
 		
 		return deferredLogin;
 	}
@@ -357,12 +353,8 @@ public class KixmppClient implements AutoCloseable {
      * 
      * @return
      */
-    public String getJid() {
-    	if (jid != null) {
-    		return jid;
-    	} else {
-    		return username + "@" + domain + "/" + resource;
-    	}
+    public KixmppJid getJid() {
+    	return jid;
     }
     
     /**
@@ -475,7 +467,7 @@ public class KixmppClient implements AutoCloseable {
      * Performs auth.
      */
     private void performAuth() {
-    	byte[] authToken = ("\0" + username + "\0" + password).getBytes(StandardCharsets.UTF_8);
+    	byte[] authToken = ("\0" + jid.getNode() + "\0" + password).getBytes(StandardCharsets.UTF_8);
 		
 		Element auth = new Element("auth", "urn:ietf:params:xml:ns:xmpp-sasl");
 		auth.setAttribute("mechanism", "PLAIN");
@@ -545,7 +537,7 @@ public class KixmppClient implements AutoCloseable {
 						if (future.isSuccess()) {
 							KixmppClient.this.channel.get().pipeline().replace(KixmppCodec.class, "kixmppCodec", new KixmppCodec());
 							
-							KixmppCodec.sendXmppStreamRootStart(KixmppClient.this.channel.get(), null, domain);
+							KixmppCodec.sendXmppStreamRootStart(KixmppClient.this.channel.get(), null, jid.getDomain());
 						} else {
 							deferredLogin.setException(new KixmppAuthException("tls failed"));
 						}
@@ -571,9 +563,9 @@ public class KixmppClient implements AutoCloseable {
 					
 					Element bind = new Element("bind", "urn:ietf:params:xml:ns:xmpp-bind");
 					
-					if (KixmppClient.this.resource != null) {
+					if (KixmppClient.this.jid.getResource() != null) {
 						Element resource = new Element("resource", null, "urn:ietf:params:xml:ns:xmpp-bind");
-						resource.setText(KixmppClient.this.resource);
+						resource.setText(KixmppClient.this.jid.getResource());
 						bind.addContent(resource);
 					}
 					
@@ -604,12 +596,12 @@ public class KixmppClient implements AutoCloseable {
 							Element bind = iqResult.getChild("bind", Namespace.getNamespace("urn:ietf:params:xml:ns:xmpp-bind"));
 							
 							if (bind != null) {
-								jid = bind.getChildText("jid", bind.getNamespace());
+								jid = KixmppJid.fromRawJid(bind.getChildText("jid", bind.getNamespace()));
 							}
 
 							// start the session
 							Element startSession = new Element("iq");
-							startSession.setAttribute("to", domain);
+							startSession.setAttribute("to", jid.getDomain());
 							startSession.setAttribute("type", "set");
 							startSession.setAttribute("id", "session");
 							
