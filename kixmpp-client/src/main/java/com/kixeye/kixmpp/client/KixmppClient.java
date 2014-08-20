@@ -69,7 +69,6 @@ import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
-import com.kixeye.kixmpp.handler.KixmppStreamHandler;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 
 /**
@@ -412,8 +411,6 @@ public class KixmppClient implements AutoCloseable {
     private void setUp() {
     	if (state.get() == State.CONNECTING) {
     		// this client deals with the following stanzas
-    		eventEngine.registerStreamHandler(streamHandler);
-    		
     		eventEngine.registerGlobalStanzaHandler("stream:features", streamFeaturesHandler);
 
     		eventEngine.registerGlobalStanzaHandler("proceed", tlsResponseHandler);
@@ -483,28 +480,6 @@ public class KixmppClient implements AutoCloseable {
 		
 		channel.get().writeAndFlush(auth);
     }
-    
-    /**
-     * Handles stream start.
-     */
-    private final KixmppStreamHandler streamHandler = new KixmppStreamHandler() {
-		/**
-		 * @see com.kixeye.kixmpp.handler.KixmppStreamHandler#handleStreamStart(io.netty.channel.Channel, com.kixeye.kixmpp.KixmppStreamStart)
-		 */
-		public void handleStreamStart(Channel channel, KixmppStreamStart streamStart) {
-			//TODO
-		}
-		
-		/**
-		 * @see com.kixeye.kixmpp.handler.KixmppStreamHandler#handleStreamEnd(io.netty.channel.Channel, com.kixeye.kixmpp.KixmppStreamEnd)
-		 */
-		public void handleStreamEnd(Channel channel, KixmppStreamEnd streamEnd) {
-			cleanUp();
-
-			deferredDisconnect.set(KixmppClient.this);
-			state.set(State.DISCONNECTED);
-		}
-	};
     
     /**
      * Handles stream features
@@ -723,6 +698,11 @@ public class KixmppClient implements AutoCloseable {
 		@Override
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 			eventEngine.publishDisconnected(ctx.channel());
+			
+			cleanUp();
+
+			deferredDisconnect.set(KixmppClient.this);
+			state.set(State.DISCONNECTED);
 			
 			if (KixmppClient.this.isConnected()) {
 				KixmppClient.this.disconnect();
