@@ -46,6 +46,7 @@ import java.util.Collections;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jdom2.Attribute;
@@ -232,6 +233,9 @@ public class KixmppClient implements AutoCloseable {
 
 		if (currentChannel != null) {
 			KixmppCodec.sendXmppStreamRootStop(channel.get());
+			
+			// do a disconnect timeout in case server doesn't close stream.
+			bootstrap.group().schedule(new DisconnectTimeoutTask(), 2, TimeUnit.SECONDS);
 		} else {
 			deferredDisconnect.setException(new KixmppException("No channel available to close."));
 		}
@@ -706,6 +710,16 @@ public class KixmppClient implements AutoCloseable {
 			
 			if (KixmppClient.this.isConnected()) {
 				KixmppClient.this.disconnect();
+			}
+		}
+	}
+	
+	private class DisconnectTimeoutTask implements Runnable {
+		public void run() {
+			Channel channel = KixmppClient.this.channel.get();
+			
+			if (channel != null) {
+				channel.close();
 			}
 		}
 	}
