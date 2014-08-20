@@ -41,6 +41,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -60,11 +61,14 @@ import com.kixeye.kixmpp.KixmppAuthException;
 import com.kixeye.kixmpp.KixmppCodec;
 import com.kixeye.kixmpp.KixmppException;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
+import com.kixeye.kixmpp.KixmppStreamEnd;
+import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.client.module.KixmppClientModule;
 import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
+import com.kixeye.kixmpp.handler.KixmppStreamHandler;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 
 /**
@@ -170,6 +174,10 @@ public class KixmppClient implements AutoCloseable {
 		
 		setUp();
 		
+		// set this in case we get disconnected
+		deferredDisconnect = SettableFuture.create();
+		deferredLogin = SettableFuture.create();
+		
 		final SettableFuture<KixmppClient> responseFuture = SettableFuture.create();
 		
 		bootstrap.connect(hostname, port).addListener(new GenericFutureListener<Future<? super Void>>() {
@@ -203,8 +211,6 @@ public class KixmppClient implements AutoCloseable {
 		this.username = username;
 		this.password = password;
 		this.resource = resource;
-
-		deferredLogin = SettableFuture.create();
 		
 		KixmppCodec.sendXmppStreamRootStart(channel.get(), null, domain);
 		
@@ -215,34 +221,21 @@ public class KixmppClient implements AutoCloseable {
 	 * Disconnects from the current server.
 	 */ 
 	public ListenableFuture<KixmppClient> disconnect() {
-		if (state.get() == State.DISCONNECTED) {
+		State currentState = compareAndSetState(State.DISCONNECTING, State.CONNECTED, State.LOGGED_IN, State.LOGGING_IN);
+		
+		if (currentState == State.DISCONNECTED) {
 			final SettableFuture<KixmppClient> deferred = SettableFuture.create();
 			deferred.set(this);
 			
 			return deferred;
-		} else if (state.get() == State.DISCONNECTING) {
+		} else if (currentState == null) {
 			return deferredDisconnect;
 		}
-		
-		checkAndSetState(State.DISCONNECTING, State.CONNECTED, State.LOGGED_IN, State.LOGGING_IN);
 
-		deferredDisconnect = SettableFuture.create();
-		
-		cleanUp();
-		
 		final Channel currentChannel = channel.get();
 
 		if (currentChannel != null) {
-			KixmppCodec.sendXmppStreamRootStop(channel.get()).addListener(new GenericFutureListener<Future<? super Void>>() {
-				public void operationComplete(Future<? super Void> arg0) throws Exception {
-					currentChannel.close().addListener(new GenericFutureListener<Future<? super Void>>() {
-						public void operationComplete(Future<? super Void> arg0) throws Exception {
-							deferredDisconnect.set(KixmppClient.this);
-							state.set(State.DISCONNECTED);
-						}
-					});
-				}
-			});
+			KixmppCodec.sendXmppStreamRootStop(channel.get());
 		} else {
 			deferredDisconnect.setException(new KixmppException("No channel available to close."));
 		}
@@ -321,6 +314,15 @@ public class KixmppClient implements AutoCloseable {
     }
     
     /**
+     * Returns true if the client is connected.
+     * 
+     * @return
+     */
+    public boolean isConnected() {
+    	return state.get() != State.DISCONNECTED;
+    }
+    
+    /**
      * Gets or installs a module.
      * 
      * @param moduleClass
@@ -364,6 +366,40 @@ public class KixmppClient implements AutoCloseable {
     }
     
     /**
+     * Cas for state.
+     * 
+     * @param update
+     * @param expectedStates
+     * @return
+     */
+    private State compareAndSetState(State update, State... expectedStates) {
+    	State setState = null;
+    	
+    	if (expectedStates != null) {
+    		for (State expectedState : expectedStates) {
+    			if (state.compareAndSet(expectedState, update)) {
+    				setState = update;
+    				break;
+    			}
+    		}
+    		
+    		if (setState == null) {
+    			if (update != state.get()) {
+        			setState = state.get();
+    			}
+    		}
+    	} else {
+    		if (state.compareAndSet(null, update)) {
+				setState = update;
+			} else {
+    			setState = state.get();
+			}
+    	}
+    	
+    	return setState;
+    }
+    
+    /**
      * Checks the state and sets it.
      * 
      * @param update
@@ -371,23 +407,9 @@ public class KixmppClient implements AutoCloseable {
      * @throws IllegalStateException
      */
     private void checkAndSetState(State update, State... expectedStates) throws IllegalStateException {
-    	if (expectedStates != null) {
-    		boolean wasSet = false;
-    		
-    		for (State expectedState : expectedStates) {
-    			if (state.compareAndSet(expectedState, update)) {
-    				wasSet = true;
-    				break;
-    			}
-    		}
-    		
-    		if (!wasSet) {
-    			throw new IllegalStateException(String.format("The current state is [%s] but must be [%s]", state.get(), expectedStates));
-    		}
-    	} else {
-    		if (!state.compareAndSet(null, update)) {
-    			throw new IllegalStateException(String.format("The current state is [%s] but must be [null]", state.get()));
-			}
+    	if (compareAndSetState(update, expectedStates) != update) {
+    		throw new IllegalStateException(String.format("The current state is [%s] but must be %s", state.get(), 
+    				expectedStates == null ? "null" : Arrays.toString(expectedStates)));
     	}
     }
     
@@ -397,6 +419,8 @@ public class KixmppClient implements AutoCloseable {
     private void setUp() {
     	if (state.get() == State.CONNECTING) {
     		// this client deals with the following stanzas
+    		eventEngine.registerStreamHandler(streamHandler);
+    		
     		eventEngine.registerGlobalStanzaHandler("stream:features", streamFeaturesHandler);
 
     		eventEngine.registerGlobalStanzaHandler("proceed", tlsResponseHandler);
@@ -466,6 +490,28 @@ public class KixmppClient implements AutoCloseable {
 		
 		channel.get().writeAndFlush(auth);
     }
+    
+    /**
+     * Handles stream start.
+     */
+    private final KixmppStreamHandler streamHandler = new KixmppStreamHandler() {
+		/**
+		 * @see com.kixeye.kixmpp.handler.KixmppStreamHandler#handleStreamStart(io.netty.channel.Channel, com.kixeye.kixmpp.KixmppStreamStart)
+		 */
+		public void handleStreamStart(Channel channel, KixmppStreamStart streamStart) {
+			//TODO
+		}
+		
+		/**
+		 * @see com.kixeye.kixmpp.handler.KixmppStreamHandler#handleStreamEnd(io.netty.channel.Channel, com.kixeye.kixmpp.KixmppStreamEnd)
+		 */
+		public void handleStreamEnd(Channel channel, KixmppStreamEnd streamEnd) {
+			cleanUp();
+
+			deferredDisconnect.set(KixmppClient.this);
+			state.set(State.DISCONNECTED);
+		}
+	};
     
     /**
      * Handles stream features
@@ -586,9 +632,6 @@ public class KixmppClient implements AutoCloseable {
 							// fail
 							deferredLogin.setException(new KixmppAuthException(new XMLOutputter().outputString(iqResult)));
 						}
-
-						// no need to keep reference around
-						deferredLogin = null;
 						break;
 					default:
 						logger.warn("Unsupported IQ stanza: " + new XMLOutputter().outputString(iqResult));
@@ -642,6 +685,10 @@ public class KixmppClient implements AutoCloseable {
 				if (!rejected) {
 					eventEngine.publishStanza(ctx.channel(), stanza);
 				}
+			} else if (msg instanceof KixmppStreamStart) {
+				eventEngine.publishStreamStart(ctx.channel(), (KixmppStreamStart)msg);
+			} else if (msg instanceof KixmppStreamEnd) {
+				eventEngine.publishStreamEnd(ctx.channel(), (KixmppStreamEnd)msg);
 			}
 		}
 		
@@ -670,14 +717,23 @@ public class KixmppClient implements AutoCloseable {
 		
 		@Override
 		public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-			logger.error("Unexpected error", cause);
+			logger.error("Unexpected error.", cause);
 			
-			KixmppClient.this.close();
+			KixmppClient.this.disconnect();
+		}
+		
+		@Override
+		public void channelActive(ChannelHandlerContext ctx) throws Exception {
+			eventEngine.publishConnected(ctx.channel());
 		}
 		
 		@Override
 		public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-			KixmppClient.this.disconnect();
+			eventEngine.publishDisconnected(ctx.channel());
+			
+			if (KixmppClient.this.isConnected()) {
+				KixmppClient.this.disconnect();
+			}
 		}
 	}
 }

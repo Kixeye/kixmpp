@@ -21,6 +21,8 @@ package com.kixeye.kixmpp.server.module.features;
  */
 
 import io.netty.channel.Channel;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 
 import java.util.List;
 
@@ -92,8 +94,12 @@ public class FeaturesKixmppServerModule implements KixmppServerModule {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStreamHandler#handleStreamEnd(io.netty.channel.Channel, com.kixeye.kixmpp.KixmppStreamEnd)
 		 */
-		public void handleStreamEnd(Channel channel, KixmppStreamEnd streamEnd) {
-			KixmppCodec.sendXmppStreamRootStop(channel);
+		public void handleStreamEnd(final Channel channel, KixmppStreamEnd streamEnd) {
+			KixmppCodec.sendXmppStreamRootStop(channel).addListener(new GenericFutureListener<Future<? super Void>>() {
+				public void operationComplete(Future<? super Void> future) throws Exception {
+					channel.close();
+				}
+			});
 		}
 	};
 }
