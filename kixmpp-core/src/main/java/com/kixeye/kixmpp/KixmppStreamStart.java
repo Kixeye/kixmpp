@@ -29,21 +29,68 @@ import org.jdom2.Element;
  * @author ebahtijaragic
  */
 public class KixmppStreamStart {
-	private final Element streamStartElement;
+	private final boolean includeXmlHeader;
+	private final KixmppJid from;
+	private final KixmppJid to;
+	
+	/**
+	 * @param includeXmlHeader
+	 * @param from
+	 * @param to
+	 */
+	public KixmppStreamStart(KixmppJid from, KixmppJid to, boolean includeXmlHeader) {
+		this.from = from;
+		this.to = to;
+		this.includeXmlHeader = includeXmlHeader;
+	}
 
 	/**
 	 * Creates a stream start.
 	 * 
-	 * @param streamStartElement
+	 * @param element
 	 */
-	public KixmppStreamStart(Element streamStartElement) {
-		this.streamStartElement = streamStartElement;
+	public KixmppStreamStart(Element element, boolean includeXmlHeader) {
+		this.includeXmlHeader = includeXmlHeader;
+		
+		if (element != null) {
+			String from = element.getAttributeValue("from");
+			String to = element.getAttributeValue("to");
+			
+			if (from != null) {
+				this.from = KixmppJid.fromRawJid(from);
+			} else {
+				this.from = null;
+			}
+			
+			if (to != null) {
+				this.to = KixmppJid.fromRawJid(to);
+			} else {
+				this.to = null;
+			}
+		} else {
+			this.from = null;
+			this.to = null;
+		}
 	}
 
 	/**
-	 * @return the streamStartElement
+	 * @return the from
 	 */
-	public Element getStreamStartElement() {
-		return streamStartElement;
+	public KixmppJid getFrom() {
+		return from;
+	}
+
+	/**
+	 * @return the to
+	 */
+	public KixmppJid getTo() {
+		return to;
+	}
+
+	/**
+	 * @return the includeXmlHeader
+	 */
+	public boolean doesIncludeXmlHeader() {
+		return includeXmlHeader;
 	}
 }

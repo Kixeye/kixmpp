@@ -211,7 +211,7 @@ public class KixmppClient implements AutoCloseable {
 		this.jid = this.jid.withNode(username).withResource(resource);
 		this.password = password;
 		
-		KixmppCodec.sendXmppStreamRootStart(channel.get(), null, jid.getDomain());
+		channel.get().writeAndFlush(new KixmppStreamStart(null, new KixmppJid(jid.getDomain()), true));
 		
 		return deferredLogin;
 	}
@@ -234,7 +234,7 @@ public class KixmppClient implements AutoCloseable {
 		final Channel currentChannel = channel.get();
 
 		if (currentChannel != null) {
-			KixmppCodec.sendXmppStreamRootStop(channel.get());
+			channel.get().writeAndFlush(new KixmppStreamEnd());
 			
 			// do a disconnect timeout in case server doesn't close stream.
 			bootstrap.group().schedule(new DisconnectTimeoutTask(), 2, TimeUnit.SECONDS);
@@ -519,7 +519,7 @@ public class KixmppClient implements AutoCloseable {
 						if (future.isSuccess()) {
 							KixmppClient.this.channel.get().pipeline().replace(KixmppCodec.class, "kixmppCodec", new KixmppCodec());
 							
-							KixmppCodec.sendXmppStreamRootStart(KixmppClient.this.channel.get(), null, jid.getDomain());
+							KixmppClient.this.channel.get().writeAndFlush(new KixmppStreamStart(null, new KixmppJid(jid.getDomain()), true));
 						} else {
 							deferredLogin.setException(new KixmppAuthException("tls failed"));
 						}

@@ -28,7 +28,7 @@ import java.util.List;
 
 import org.jdom2.Element;
 
-import com.kixeye.kixmpp.KixmppCodec;
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.handler.KixmppStreamHandler;
@@ -74,7 +74,7 @@ public class FeaturesKixmppServerModule implements KixmppServerModule {
 		public void handleStreamStart(Channel channel, KixmppStreamStart streamStart) {
 			Boolean isAuthed = channel.attr(SaslKixmppServerModule.IS_AUTHENTICATED).get();
 			
-			KixmppCodec.sendXmppStreamRootStart(channel, server.getDomain(), null, isAuthed == null);
+			channel.writeAndFlush(new KixmppStreamStart(new KixmppJid(server.getDomain()), null, isAuthed == null));
 			
 			Element features = new Element("features", "stream", "http://etherx.jabber.org/streams");
 			
@@ -95,7 +95,7 @@ public class FeaturesKixmppServerModule implements KixmppServerModule {
 		 * @see com.kixeye.kixmpp.server.KixmppStreamHandler#handleStreamEnd(io.netty.channel.Channel, com.kixeye.kixmpp.KixmppStreamEnd)
 		 */
 		public void handleStreamEnd(final Channel channel, KixmppStreamEnd streamEnd) {
-			KixmppCodec.sendXmppStreamRootStop(channel).addListener(new GenericFutureListener<Future<? super Void>>() {
+			channel.writeAndFlush(new KixmppStreamEnd()).addListener(new GenericFutureListener<Future<? super Void>>() {
 				public void operationComplete(Future<? super Void> future) throws Exception {
 					channel.close();
 				}

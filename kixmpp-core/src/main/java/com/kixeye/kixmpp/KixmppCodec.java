@@ -23,8 +23,6 @@ package com.kixeye.kixmpp;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageCodec;
 
@@ -140,7 +138,7 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 								
 								streamElementBuilder.process(streamReader);
 			
-								out.add(new KixmppStreamStart(null));
+								out.add(new KixmppStreamStart(null, true));
 							}
 						// only handle events that have element depth of 2 and above (everything under <stream:stream>..)
 						} else if (streamReader.getDepth() >= STANZA_ELEMENT_DEPTH) {
@@ -209,6 +207,21 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 	protected void encode(ChannelHandlerContext ctx, Object msg, ByteBuf out) throws Exception {
 		if (msg instanceof Element) {
 			new XMLOutputter().output((Element)msg, new ByteBufOutputStream(out));
+		} else if (msg instanceof KixmppStreamStart) {
+			KixmppStreamStart streamStart = (KixmppStreamStart)msg;
+			if (streamStart.doesIncludeXmlHeader()) {
+				out.writeBytes("<?xml version='1.0' encoding='UTF-8'?>".getBytes(StandardCharsets.UTF_8));
+			}
+			out.writeBytes("<stream:stream ".getBytes(StandardCharsets.UTF_8));
+			if (streamStart.getFrom() != null) {
+				out.writeBytes(String.format("from=\"%s\" ", streamStart.getFrom().getFullJid()).getBytes(StandardCharsets.UTF_8));
+			}
+			if (streamStart.getTo() != null) {
+				out.writeBytes(String.format("to=\"%s\" ", streamStart.getTo().getFullJid()).getBytes(StandardCharsets.UTF_8));
+			}
+			out.writeBytes("version=\"1.0\" xmlns=\"jabber:client\" xmlns:stream=\"http://etherx.jabber.org/streams\">".getBytes(StandardCharsets.UTF_8));
+		} else if (msg instanceof KixmppStreamEnd) {
+			out.writeBytes("</stream:stream>".getBytes(StandardCharsets.UTF_8));
 		} else if (msg instanceof String) {
 			out.writeBytes(((String)msg).getBytes(StandardCharsets.UTF_8));
 		} else if (msg instanceof ByteBuf) {
@@ -220,52 +233,5 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 		if (logger.isDebugEnabled()) {
 			logger.debug("Sending: [{}]", out.toString(StandardCharsets.UTF_8));
 		}
-	}
-	
-	/**
-	 * Sends the room XML element for starting a XMPP session.
-	 * 
-	 * @param channel
-	 * @param from
-	 * @param to
-	 * @param sendXmlHeader
-	 */
-	public static final ChannelFuture sendXmppStreamRootStart(Channel channel, String from, String to, boolean sendXmlHeader) {
-		ByteBuf buffer = channel.alloc().buffer();
-		
-		if (sendXmlHeader) {
-			buffer.writeBytes("<?xml version='1.0' encoding='UTF-8'?>".getBytes(StandardCharsets.UTF_8));
-		}
-		buffer.writeBytes("<stream:stream ".getBytes(StandardCharsets.UTF_8));
-		if (from != null) {
-			buffer.writeBytes(String.format("from=\"%s\" ", from).getBytes(StandardCharsets.UTF_8));
-		}
-		if (to != null) {
-			buffer.writeBytes(String.format("to=\"%s\" ", to).getBytes(StandardCharsets.UTF_8));
-		}
-		buffer.writeBytes("version=\"1.0\" xmlns=\"jabber:client\" xmlns:stream=\"http://etherx.jabber.org/streams\">".getBytes(StandardCharsets.UTF_8));
-		
-		return channel.writeAndFlush(buffer);
-	}
-	
-	/**
-	 * Sends the room XML element for starting a XMPP session.
-	 * 
-	 * @param channel
-	 * @param from
-	 * @param to
-	 */
-	public static final ChannelFuture sendXmppStreamRootStart(Channel channel, String from, String to) {
-		return sendXmppStreamRootStart(channel, from, to, true);
-	}
-	
-	/**
-	 * Sends the room XML element for stopping a XMPP session.
-	 * 
-	 * @param channel
-	 * @param domain
-	 */
-	public static final ChannelFuture sendXmppStreamRootStop(Channel channel) {
-		return channel.writeAndFlush("</stream:stream>");
 	}
 }
