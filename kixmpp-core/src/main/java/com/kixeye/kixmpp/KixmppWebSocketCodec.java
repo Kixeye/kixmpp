@@ -122,7 +122,7 @@ public class KixmppWebSocketCodec extends MessageToMessageCodec<WebSocketFrame, 
 		} else if ("close".equals(element.getName())) {
 			out.add(new KixmppStreamEnd());
 		} else {
-			out.add(document.getRootElement());
+			out.add(element);
 		}
 	}
 }

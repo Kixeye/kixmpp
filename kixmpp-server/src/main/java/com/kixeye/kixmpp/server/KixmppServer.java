@@ -1,18 +1,38 @@
 package com.kixeye.kixmpp.server;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
+import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
+import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -42,6 +62,7 @@ import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.KixmppWebSocketCodec;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 import com.kixeye.kixmpp.p2p.ClusterClient;
@@ -96,13 +117,18 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	private static final Logger logger = LoggerFactory.getLogger(KixmppServer.class);
 	
 	public static final InetSocketAddress DEFAULT_SOCKET_ADDRESS = new InetSocketAddress(5222);
+	public static final InetSocketAddress DEFAULT_WEBSOCKET_ADDRESS = new InetSocketAddress(5290);
     public static final InetSocketAddress DEFAULT_CLUSTER_ADDRESS = new InetSocketAddress(8100);
+    
     public static final int CUSTOM_MESSAGE_START = 16;
 
 	private final InetSocketAddress bindAddress;
 	private final String domain;
-	
+
 	private final ServerBootstrap bootstrap;
+
+	private InetSocketAddress webSocketAddress;
+	private ServerBootstrap webSocketBootstrap;
 	
 	private final KixmppEventEngine eventEngine;
 	
@@ -113,6 +139,10 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 
 	private final AtomicReference<ChannelFuture> channelFuture = new AtomicReference<>();
 	private final AtomicReference<Channel> channel = new AtomicReference<>();
+
+	private final AtomicReference<ChannelFuture> webSocketChannelFuture = new AtomicReference<>();
+	private final AtomicReference<Channel> webSocketChannel = new AtomicReference<>();
+	
 	private AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
 	
 	private final DefaultChannelGroup channels;
@@ -202,6 +232,39 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	}
 	
 	/**
+	 * Enables the WebSocket port.
+	 */
+	public KixmppServer enableWebSocket() {
+		return enableWebSocket(DEFAULT_WEBSOCKET_ADDRESS);
+	}
+	
+	/**
+	 * Enables the WebSocket port.
+	 * 
+	 * @param webSocketAddress
+	 */
+	public KixmppServer enableWebSocket(InetSocketAddress webSocketAddress) {
+		if (state.get() != State.STOPPED) {
+			throw new IllegalStateException(String.format("The current state is [%s] but must be [STOPPED]", state.get()));
+		}
+		
+		this.webSocketAddress = webSocketAddress;
+		
+		this.webSocketBootstrap = this.bootstrap.clone()
+				.childHandler(new ChannelInitializer<SocketChannel>() {
+					protected void initChannel(SocketChannel ch) throws Exception {
+						ch.pipeline().addLast(new HttpServerCodec());
+						ch.pipeline().addLast(new HttpObjectAggregator(65536));
+						ch.pipeline().addLast(new WebSocketServerHandler());
+						ch.pipeline().addLast(new KixmppWebSocketCodec());
+						ch.pipeline().addLast(new KixmppServerMessageHandler());
+					}
+				});
+		
+		return this;
+	}
+	
+	/**
 	 * Starts the server.
 	 * 
 	 * @throws Exception
@@ -217,27 +280,63 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		}
 		
 		final SettableFuture<KixmppServer> responseFuture = SettableFuture.create();
+		
+		final GenericFutureListener<Future<? super Void>> channelFutureListener = new GenericFutureListener<Future<? super Void>>() {
+			@Override
+			public synchronized void operationComplete(Future<? super Void> future) throws Exception {
+				if (webSocketChannelFuture.get() != null && webSocketChannelFuture.get().isDone()) {
+					if (webSocketChannelFuture.get().isSuccess()) {
+						logger.info("Kixmpp WebSocket Server listening on [{}]", webSocketAddress);
+						
+						webSocketChannel.set(webSocketChannelFuture.get().channel());
+						if (channelFuture.get() == null && !responseFuture.isDone()) {
+							logger.info("Started Kixmpp Server");
+							state.set(State.STARTED);
+							responseFuture.set(KixmppServer.this);
+						}
+						webSocketChannelFuture.set(null);
+					} else {
+						logger.error("Unable to start Kixmpp WebSocket Server on [{}]", webSocketAddress, future.cause());
+
+						if (channelFuture.get() == null && !responseFuture.isDone()) {
+							state.set(State.STOPPED);
+							responseFuture.setException(future.cause());
+						}
+						webSocketChannelFuture.set(null);
+					}
+				} else if (channelFuture.get() != null && channelFuture.get().isDone()) {
+					if (channelFuture.get().isSuccess()) {
+						logger.info("Kixmpp Server listening on [{}]", bindAddress);
+						
+						channel.set(channelFuture.get().channel());
+						if (webSocketChannelFuture.get() == null && !responseFuture.isDone()) {
+							logger.info("Started Kixmpp Server");
+							state.set(State.STARTED);
+							responseFuture.set(KixmppServer.this);
+						}
+						channelFuture.set(null);
+					} else {
+						logger.error("Unable to start Kixmpp Server on [{}]", bindAddress, future.cause());
+
+						if (webSocketChannelFuture.get() == null && !responseFuture.isDone()) {
+							state.set(State.STOPPED);
+							responseFuture.setException(future.cause());
+						}
+						channelFuture.set(null);
+					}
+				}
+			}
+		};
 
 		channelFuture.set(bootstrap.bind(bindAddress));
 
-		channelFuture.get().addListener(new GenericFutureListener<Future<? super Void>>() {
-			@Override
-			public void operationComplete(Future<? super Void> future) throws Exception {
-				if (future.isSuccess()) {
-					logger.info("Kixmpp Server listening on [{}]", bindAddress);
-					
-					channel.set(channelFuture.get().channel());
-					state.set(State.STARTED);
-					channelFuture.set(null);
-					responseFuture.set(KixmppServer.this);
-				} else {
-					logger.error("Unable to start Kixmpp Server on [{}]", bindAddress, future.cause());
-					
-					state.set(State.STOPPED);
-					responseFuture.setException(future.cause());
-				}
-			}
-		});
+		channelFuture.get().addListener(channelFutureListener);
+		
+		if (webSocketAddress != null && webSocketBootstrap != null) {
+			webSocketChannelFuture.set(webSocketBootstrap.bind(webSocketAddress));
+
+			webSocketChannelFuture.get().addListener(channelFutureListener);
+		}
 		
 		return responseFuture;
 	}
@@ -268,26 +367,44 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 			serverChannelFuture.cancel(true);
 		}
 		
-		Channel serverChannel = channel.get();
+		ChannelFuture webSocketServerChannelFuture = webSocketChannelFuture.get();
 		
-		if (serverChannel != null) {
-			serverChannel.disconnect().addListener(new GenericFutureListener<Future<? super Void>>() {
-				public void operationComplete(Future<? super Void> future) throws Exception {
-					logger.info("Stopped Kixmpp Server");
-					
-					state.set(State.STOPPED);
-					
-					eventEngine.unregisterAll();
-					
-					responseFuture.set(KixmppServer.this);
-				}
-			});
-		} else {
+		if (webSocketServerChannelFuture != null) {
+			webSocketServerChannelFuture.cancel(true);
+		}
+		
+		final Channel serverChannel = channel.get();
+		final Channel webSocketServerChannel = webSocketChannel.get();
+		
+		if (serverChannel == null && webSocketServerChannel == null) {
 			logger.info("Stopped Kixmpp Server");
 			
 			state.set(State.STOPPED);
 
 			responseFuture.set(KixmppServer.this);
+		} else {
+			final GenericFutureListener<Future<? super Void>> channelFutureListener = new GenericFutureListener<Future<? super Void>>() {
+				public synchronized void operationComplete(Future<? super Void> future) throws Exception {
+					if ((serverChannel != null && !serverChannel.isActive()) && 
+						(webSocketServerChannel != null && !webSocketServerChannel.isActive())) {
+						logger.info("Stopped Kixmpp Server");
+						
+						state.set(State.STOPPED);
+						
+						eventEngine.unregisterAll();
+						
+						responseFuture.set(KixmppServer.this);
+					}
+				}
+			};
+			
+			if (serverChannel != null) {
+				serverChannel.disconnect().addListener(channelFutureListener);
+			}
+			
+			if (webSocketServerChannel != null) {
+				webSocketServerChannel.disconnect().addListener(channelFutureListener);
+			}
 		}
 		
 		return responseFuture;
@@ -613,6 +730,86 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 			
 			ctx.close();
 		}
+	}
+	
+	public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> {
+	    private WebSocketServerHandshaker handshaker;
+
+	    @Override
+	    public void channelRead0(ChannelHandlerContext ctx, Object msg) {
+	        if (msg instanceof FullHttpRequest) {
+	            handleHttpRequest(ctx, (FullHttpRequest) msg);
+	        } else if (msg instanceof WebSocketFrame) {
+	            handleWebSocketFrame(ctx, (WebSocketFrame) msg);
+	        }
+	    }
+
+	    @Override
+	    public void channelReadComplete(ChannelHandlerContext ctx) {
+	        ctx.flush();
+	    }
+
+	    private void handleHttpRequest(ChannelHandlerContext ctx, FullHttpRequest req) {
+	        // Handle a bad request.
+	        if (!req.getDecoderResult().isSuccess()) {
+	            sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST));
+	            return;
+	        }
+
+	        // Allow only GET methods.
+	        if (req.getMethod() != HttpMethod.GET) {
+	            sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.FORBIDDEN));
+	            return;
+	        }
+
+	        // Handshake
+	        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(getWebSocketLocation(req), null, false);
+	        handshaker = wsFactory.newHandshaker(req);
+	        
+	        if (handshaker == null) {
+	            WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
+	        } else {
+	            handshaker.handshake(ctx.channel(), req);
+	        }
+	    }
+
+	    private void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame frame) {
+	        if (frame instanceof CloseWebSocketFrame) {
+	            handshaker.close(ctx.channel(), (CloseWebSocketFrame) frame.retain());
+	        } else if (frame instanceof PingWebSocketFrame) {
+	            ctx.channel().write(new PongWebSocketFrame(frame.content().retain()));
+	        } else {
+                ctx.fireChannelRead(frame);
+	        }
+	    }
+
+	    private void sendHttpResponse(ChannelHandlerContext ctx, FullHttpRequest req, FullHttpResponse res) {
+	        // Generate an error page if response getStatus code is not OK (200).
+	        if (res.getStatus().code() != 200) {
+	            ByteBuf buf = Unpooled.copiedBuffer(res.getStatus().toString(), CharsetUtil.UTF_8);
+	            res.content().writeBytes(buf);
+	            buf.release();
+	            HttpHeaders.setContentLength(res, res.content().readableBytes());
+	        }
+
+	        // Send the response and close the connection if necessary.
+	        ChannelFuture f = ctx.channel().writeAndFlush(res);
+	        if (!HttpHeaders.isKeepAlive(req) || res.getStatus().code() != 200) {
+	            f.addListener(ChannelFutureListener.CLOSE);
+	        }
+	    }
+
+	    @Override
+	    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+	        cause.printStackTrace();
+	        ctx.close();
+	    }
+
+	    private String getWebSocketLocation(FullHttpRequest req) {
+	        String location =  req.headers().get(HttpHeaders.Names.HOST);
+	        
+            return "ws://" + location;
+	    }
 	}
 
     public ClusterClient getCluster() {
