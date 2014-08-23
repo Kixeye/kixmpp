@@ -141,7 +141,11 @@ public class KixmppJid {
 	 * @return
 	 */
 	public String getBaseJid() {
-		return node + "@" + domain;
+		if (node == null) {
+			return domain;
+		} else {
+			return node + "@" + domain;
+		}
 	}
 	
 	/**
@@ -151,7 +155,7 @@ public class KixmppJid {
 	 */
 	public String getFullJid() {
 		if (resource == null) {
-			return node + "@" + domain;
+			return getBaseJid();
 		} else {
 			return node + "@" + domain + "/" + resource;
 		}

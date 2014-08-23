@@ -70,8 +70,7 @@ public class KixmppServerTest {
 			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
 			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
 
-			try (KixmppClient client = new KixmppClient(
-					SslContext.newClientContext())) {
+			try (KixmppClient client = new KixmppClient(SslContext.newClientContext(), KixmppClient.Type.TCP)) {
 				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();
 				final LinkedBlockingQueue<MucJoin> mucJoins = new LinkedBlockingQueue<>();
 				final LinkedBlockingQueue<MucMessage> mucMessages = new LinkedBlockingQueue<>();
@@ -201,14 +200,74 @@ public class KixmppServerTest {
 			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
 			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
 
-			try (KixmppClient client = new KixmppClient(
-					SslContext.newClientContext())) {
+			try (KixmppClient client = new KixmppClient(SslContext.newClientContext(), KixmppClient.Type.TCP)) {
 				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();
 				final LinkedBlockingQueue<MucJoin> mucJoins = new LinkedBlockingQueue<>();
 				final LinkedBlockingQueue<MucMessage> mucMessages = new LinkedBlockingQueue<>();
 
 				Assert.assertNotNull(client.connect("localhost",
 						server.getBindAddress().getPort(), server.getDomain())
+						.get(2, TimeUnit.SECONDS));
+
+				client.module(PresenceKixmppClientModule.class)
+						.addPresenceListener(new PresenceListener() {
+							public void handle(Presence presence) {
+								presences.offer(presence);
+							}
+						});
+
+				client.module(MucKixmppClientModule.class).addJoinListener(
+						new MucListener<MucJoin>() {
+							public void handle(MucJoin event) {
+								mucJoins.offer(event);
+							}
+						});
+
+				client.module(MucKixmppClientModule.class).addMessageListener(
+						new MucListener<MucMessage>() {
+							public void handle(MucMessage event) {
+								mucMessages.offer(event);
+							}
+						});
+
+				Assert.assertNotNull(client.login("testUser", "testPassword", "testResource").get(2, TimeUnit.SECONDS));
+				client.module(PresenceKixmppClientModule.class).updatePresence(new Presence());
+
+				Assert.assertNotNull(presences.poll(2, TimeUnit.SECONDS));
+
+				client.module(MucKixmppClientModule.class).joinRoom(KixmppJid.fromRawJid("someRoom@conference.testChat"), "testNick");
+
+				MucJoin mucJoin = mucJoins.poll(2, TimeUnit.SECONDS);
+
+				Assert.assertNotNull(mucJoin);
+
+				client.module(MucKixmppClientModule.class).sendRoomMessage(mucJoin.getRoomJid(), "someMessage", "testNick");
+
+				MucMessage mucMessage = mucMessages.poll(2, TimeUnit.SECONDS);
+
+				Assert.assertNotNull(mucMessage);
+				Assert.assertEquals("someMessage", mucMessage.getBody());
+			}
+		}
+	}
+	
+	@Test
+	public void testSimpleUsingKixmppWithWebSocket() throws Exception {
+		try (KixmppServer server = new KixmppServer("testChat")) {
+			server.enableWebSocket();
+			
+			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
+
+			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
+			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
+
+			try (KixmppClient client = new KixmppClient(SslContext.newClientContext(), KixmppClient.Type.WEBSOCKET)) {
+				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();
+				final LinkedBlockingQueue<MucJoin> mucJoins = new LinkedBlockingQueue<>();
+				final LinkedBlockingQueue<MucMessage> mucMessages = new LinkedBlockingQueue<>();
+
+				Assert.assertNotNull(client.connect("localhost",
+						server.getWebSocketAddress().getPort(), server.getDomain())
 						.get(2, TimeUnit.SECONDS));
 
 				client.module(PresenceKixmppClientModule.class)
@@ -274,8 +333,7 @@ public class KixmppServerTest {
 				}
 			});
 
-			try (KixmppClient client = new KixmppClient(
-					SslContext.newClientContext())) {
+			try (KixmppClient client = new KixmppClient(SslContext.newClientContext(), KixmppClient.Type.TCP)) {
 				final LinkedBlockingQueue<Presence> presences = new LinkedBlockingQueue<>();
 				final LinkedBlockingQueue<MucJoin> mucJoins = new LinkedBlockingQueue<>();
 				final LinkedBlockingQueue<MucMessage> mucMessages = new LinkedBlockingQueue<>();

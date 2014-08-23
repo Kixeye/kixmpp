@@ -124,7 +124,7 @@ public class ClusterTest {
                this.server = server;
                this.username = username;
                try {
-                   client = new KixmppClient(SslContext.newClientContext());
+                   client = new KixmppClient(SslContext.newClientContext(), KixmppClient.Type.TCP);
                } catch (SSLException e) {
                    logger.error("SSL Exception", e);
                }

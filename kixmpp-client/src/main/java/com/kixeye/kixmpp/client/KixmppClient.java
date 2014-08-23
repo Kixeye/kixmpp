@@ -31,15 +31,25 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.base64.Base64;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpClientCodec;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
+import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
+import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,6 +75,7 @@ import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.KixmppStanzaRejectedException;
 import com.kixeye.kixmpp.KixmppStreamEnd;
 import com.kixeye.kixmpp.KixmppStreamStart;
+import com.kixeye.kixmpp.KixmppWebSocketCodec;
 import com.kixeye.kixmpp.client.module.KixmppClientModule;
 import com.kixeye.kixmpp.client.module.chat.MessageKixmppClientModule;
 import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
@@ -81,6 +92,11 @@ import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 public class KixmppClient implements AutoCloseable {
 	private static final Logger logger = LoggerFactory.getLogger(KixmppClient.class);
 	
+	public enum Type {
+		TCP,
+		WEBSOCKET
+	}
+	
     private final ConcurrentHashMap<KixmppClientOption<?>, Object> clientOptions = new ConcurrentHashMap<KixmppClientOption<?>, Object>();
 	private final Bootstrap bootstrap;
 	
@@ -93,6 +109,10 @@ public class KixmppClient implements AutoCloseable {
 	private final Set<String> modulesToRegister = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 	private final ConcurrentHashMap<String, KixmppClientModule> modules = new ConcurrentHashMap<>();
 	
+	private final Type type;
+	
+	private WebSocketClientHandshaker handshaker;
+	
 	private SettableFuture<KixmppClient> deferredLogin;
 	private SettableFuture<KixmppClient> deferredDisconnect;
 
@@ -100,6 +120,7 @@ public class KixmppClient implements AutoCloseable {
 	private String password;
 	
 	private AtomicReference<Channel> channel = new AtomicReference<>(null);
+	private AtomicReference<GenericFutureListener<Future<? super Void>>> connectListener = new AtomicReference<>();
 	
 	private AtomicReference<State> state = new AtomicReference<>(State.DISCONNECTED);
 	private static enum State {
@@ -120,7 +141,7 @@ public class KixmppClient implements AutoCloseable {
 	 * @param sslContext
 	 */
 	public KixmppClient() {
-		this(new NioEventLoopGroup(), new KixmppEventEngine(), null);
+		this(new NioEventLoopGroup(), new KixmppEventEngine(), null, Type.TCP);
 	}
 	
 	/**
@@ -128,8 +149,8 @@ public class KixmppClient implements AutoCloseable {
 	 * 
 	 * @param sslContext
 	 */
-	public KixmppClient(SslContext sslContext) {
-		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext);
+	public KixmppClient(SslContext sslContext, Type type) {
+		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext, type);
 	}
 
 	/**
@@ -140,17 +161,12 @@ public class KixmppClient implements AutoCloseable {
 	 * @param reactor
 	 * @param sslContext
 	 */
-	public KixmppClient(EventLoopGroup eventLoopGroup, KixmppEventEngine eventEngine, SslContext sslContext) {
+	public KixmppClient(EventLoopGroup eventLoopGroup, KixmppEventEngine eventEngine, SslContext sslContext, Type type) {
 		if (sslContext != null) {
 			assert sslContext.isClient() : "The given SslContext must be a client context.";
 		}
 		
-		bootstrap = new Bootstrap()
-			.group(eventLoopGroup)
-			.channel(NioSocketChannel.class)
-			.option(ChannelOption.TCP_NODELAY, false)
-			.option(ChannelOption.SO_KEEPALIVE, true)
-			.handler(new KixmppClientChannelInitializer());
+		this.type = type;
 		
 		this.sslContext = sslContext;
 		this.eventEngine = eventEngine;
@@ -159,6 +175,21 @@ public class KixmppClient implements AutoCloseable {
 		this.modulesToRegister.add(MucKixmppClientModule.class.getName());
 		this.modulesToRegister.add(PresenceKixmppClientModule.class.getName());
 		this.modulesToRegister.add(MessageKixmppClientModule.class.getName());
+
+		this.bootstrap = new Bootstrap()
+			.group(eventLoopGroup)
+			.channel(NioSocketChannel.class)
+			.option(ChannelOption.TCP_NODELAY, false)
+			.option(ChannelOption.SO_KEEPALIVE, true);
+		
+		switch (type) {
+			case TCP:
+				bootstrap.handler(new KixmppClientChannelInitializer());
+				break;
+			case WEBSOCKET:
+				bootstrap.handler(new KixmppClientWebSocketChannelInitializer());
+				break;
+		}
 	}
 	
 	/**
@@ -171,6 +202,12 @@ public class KixmppClient implements AutoCloseable {
 		checkAndSetState(State.CONNECTING, State.DISCONNECTED);
 		
 		this.jid = new KixmppJid(domain);
+        try {
+			this.handshaker = WebSocketClientHandshakerFactory.newHandshaker(
+					new URI("ws://" + hostname + ":" + port), WebSocketVersion.V13, null, false, new DefaultHttpHeaders());
+        } catch (Exception e) {
+        	throw new RuntimeException("Unable to set up handshaker.", e);
+        }
 		
 		setUp();
 		
@@ -180,10 +217,12 @@ public class KixmppClient implements AutoCloseable {
 		
 		final SettableFuture<KixmppClient> responseFuture = SettableFuture.create();
 		
-		bootstrap.connect(hostname, port).addListener(new GenericFutureListener<Future<? super Void>>() {
+		connectListener.set(new GenericFutureListener<Future<? super Void>>() {
 			public void operationComplete(Future<? super Void> future) throws Exception {
 				if (future.isSuccess()) {
 					if (state.compareAndSet(State.CONNECTING, State.CONNECTED)) {
+						logger.info("Kixmpp Client connected to [{}]", ((ChannelFuture)future).channel().remoteAddress());
+						
 						channel.set(((ChannelFuture)future).channel());
 						responseFuture.set(KixmppClient.this);
 					}
@@ -193,6 +232,24 @@ public class KixmppClient implements AutoCloseable {
 				}
 			}
 		});
+		
+		ChannelFuture future = bootstrap.connect(hostname, port);
+		
+		switch (type) {
+			case TCP:
+				future.addListener(connectListener.get());
+				break;
+			case WEBSOCKET:
+				future.addListener(new GenericFutureListener<Future<? super Void>>() {
+					public void operationComplete(Future<? super Void> future) throws Exception {
+						if (!future.isSuccess()) {
+							state.set(State.DISCONNECTED);
+							responseFuture.setException(future.cause());
+						}
+					}
+				});
+				break;
+		}
 		
 		return responseFuture;
 	}
@@ -361,6 +418,15 @@ public class KixmppClient implements AutoCloseable {
      */
     public KixmppJid getJid() {
     	return jid;
+    }
+    
+    /**
+     * Gets the type of client.
+     * 
+     * @return
+     */
+    public Type getType() {
+    	return type;
     }
     
     /**
@@ -632,6 +698,25 @@ public class KixmppClient implements AutoCloseable {
 	}
 	
 	/**
+     * Channel initializer for the {@link KixmppClient} using WebSocket.
+     * 
+     * @author ebahtijaragic
+     */
+	private final class KixmppClientWebSocketChannelInitializer extends ChannelInitializer<SocketChannel> {
+		/**
+		 * @see io.netty.channel.ChannelInitializer#initChannel(io.netty.channel.Channel)
+		 */
+		protected void initChannel(SocketChannel ch) throws Exception {
+			// initially only add the codec and out client handler
+			ch.pipeline().addLast(new HttpClientCodec());
+			ch.pipeline().addLast(new HttpObjectAggregator(65536));
+			ch.pipeline().addLast(new WebSocketClientHandler());
+			ch.pipeline().addLast("kixmppCodec", new KixmppWebSocketCodec());
+			ch.pipeline().addLast("kixmppClientMessageHandler", new KixmppClientMessageHandler());
+		}
+	}
+	
+	/**
 	 * Message handler for the {@link KixmppClient}
 	 * 
 	 * @author ebahtijaragic
@@ -714,6 +799,50 @@ public class KixmppClient implements AutoCloseable {
 				KixmppClient.this.disconnect();
 			}
 		}
+	}
+	
+	public class WebSocketClientHandler extends SimpleChannelInboundHandler<Object> {
+	    private ChannelPromise handshakeFuture;
+
+	    public ChannelFuture handshakeFuture() {
+	        return handshakeFuture;
+	    }
+
+	    @Override
+	    public void handlerAdded(ChannelHandlerContext ctx) {
+	        handshakeFuture = ctx.newPromise();
+	    }
+
+	    @Override
+	    public void channelActive(ChannelHandlerContext ctx) {
+	        handshaker.handshake(ctx.channel());
+	        
+	        ctx.fireChannelActive();
+	    }
+	    
+	    @Override
+	    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+	        ctx.fireChannelInactive();
+	    }
+
+	    @Override
+	    public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+	        Channel ch = ctx.channel();
+	        if (!handshaker.isHandshakeComplete()) {
+	            handshaker.finishHandshake(ch, (FullHttpResponse) msg);
+	            handshakeFuture.setSuccess().addListener(connectListener.get());
+	            return;
+	        }
+
+	        if (msg instanceof FullHttpResponse) {
+	            FullHttpResponse response = (FullHttpResponse) msg;
+	            throw new IllegalStateException(
+	                    "Unexpected FullHttpResponse (getStatus=" + response.getStatus() +
+	                            ", content=" + response.content().toString(CharsetUtil.UTF_8) + ')');
+	        }
+
+	       ctx.fireChannelRead(msg);
+	    }
 	}
 	
 	private class DisconnectTimeoutTask implements Runnable {

@@ -33,12 +33,14 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import org.jdom2.Content;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 import org.jdom2.input.SAXBuilder;
 import org.jdom2.input.sax.XMLReaderSAX2Factory;
 import org.jdom2.output.XMLOutputter;
+import org.jdom2.util.IteratorIterable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,10 +49,22 @@ import org.slf4j.LoggerFactory;
  * 
  * @author ebahtijaragic
  */
-public class KixmppWebSocketCodec extends MessageToMessageCodec<WebSocketFrame, Object> {
+public class KixmppWebSocketCodec extends MessageToMessageCodec<Object, Object> {
 	private static final Logger logger  = LoggerFactory.getLogger(KixmppWebSocketCodec.class);
 	
 	private XMLReaderSAX2Factory readerFactory = new XMLReaderSAX2Factory(false);
+	
+	@Override
+	public boolean acceptInboundMessage(Object msg) throws Exception {
+		return msg instanceof WebSocketFrame;
+	}
+	
+	@Override
+	public boolean acceptOutboundMessage(Object msg) throws Exception {
+		return msg instanceof Element || msg instanceof KixmppStreamStart || 
+				msg instanceof KixmppStreamEnd || msg instanceof String || 
+				msg instanceof ByteBuf;
+	}
 	
 	@Override
 	protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
@@ -64,6 +78,19 @@ public class KixmppWebSocketCodec extends MessageToMessageCodec<WebSocketFrame, 
 					element.setNamespace(Namespace.getNamespace("http://etherx.jabber.org/streams"));
 				} else {
 					element.setNamespace(Namespace.getNamespace("jabber:client"));
+					
+					IteratorIterable<Content> descendants = element.getDescendants();
+					
+					while (descendants.hasNext()) {
+						Content content = descendants.next();
+						
+						if (content instanceof Element) {
+							Element descendantElement = (Element)content;
+							if (descendantElement.getNamespace() == null || descendantElement.getNamespace() == Namespace.NO_NAMESPACE) {
+								descendantElement.setNamespace(element.getNamespace());
+							}
+						}
+					}
 				}
 			}
 			
@@ -79,11 +106,11 @@ public class KixmppWebSocketCodec extends MessageToMessageCodec<WebSocketFrame, 
 			writer.append("<open xmlns=\"urn:ietf:params:xml:ns:xmpp-framing\"");
 			
 			if (streamStart.getFrom() != null) {
-				writer.append(" from=\" + " + streamStart.getFrom().getFullJid() + "\"");
+				writer.append(" from=\"" + streamStart.getFrom().getFullJid() + "\"");
 			}
 			
 			if (streamStart.getTo() != null) {
-				writer.append(" to=\" + " + streamStart.getTo().getFullJid() + "\"");
+				writer.append(" to=\"" + streamStart.getTo().getFullJid() + "\"");
 			}
 			
 			writer.append(" version=\"1.0\" />");
@@ -107,13 +134,15 @@ public class KixmppWebSocketCodec extends MessageToMessageCodec<WebSocketFrame, 
 	}
 
 	@Override
-	protected void decode(ChannelHandlerContext ctx, WebSocketFrame msg, List<Object> out) throws Exception {
+	protected void decode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
+		WebSocketFrame frame = (WebSocketFrame)msg;
+		
 		if (logger.isDebugEnabled()) {
-			logger.debug("Received: [{}]", msg.content().toString(StandardCharsets.UTF_8));
+			logger.debug("Received: [{}]", frame.content().toString(StandardCharsets.UTF_8));
 		}
 		
 		SAXBuilder saxBuilder = new SAXBuilder(readerFactory);
-		Document document = saxBuilder.build(new ByteBufInputStream(msg.content()));
+		Document document = saxBuilder.build(new ByteBufInputStream(frame.retain().content()));
 		
 		Element element = document.getRootElement();
 		

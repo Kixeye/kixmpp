@@ -250,7 +250,9 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		
 		this.webSocketAddress = webSocketAddress;
 		
-		this.webSocketBootstrap = this.bootstrap.clone()
+		this.webSocketBootstrap = new ServerBootstrap()
+				.group(this.bootstrap.group(), this.bootstrap.childGroup())
+				.channel(NioServerSocketChannel.class)
 				.childHandler(new ChannelInitializer<SocketChannel>() {
 					protected void initChannel(SocketChannel ch) throws Exception {
 						ch.pipeline().addLast(new HttpServerCodec());
@@ -489,6 +491,13 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 */
 	public InetSocketAddress getBindAddress() {
 		return bindAddress;
+	}
+	
+	/**
+	 * @return the bindAddress
+	 */
+	public InetSocketAddress getWebSocketAddress() {
+		return webSocketAddress;
 	}
 
 	/**
