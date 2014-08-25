@@ -40,7 +40,6 @@ public class InMemoryMucService implements MucService {
     private final KixmppServer server;
 	private final String subDomain;
 
-	
 	/**
 	 * @param server
 	 * @param subDomain

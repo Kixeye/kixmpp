@@ -22,14 +22,18 @@ package com.kixeye.kixmpp.server.module.roster;
 
 import io.netty.channel.Channel;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 
+import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
 /**
  * Handles roster features.
@@ -37,7 +41,17 @@ import com.kixeye.kixmpp.server.module.KixmppServerModule;
  * @author ebahtijaragic
  */
 public class RosterKixmppServerModule implements KixmppServerModule {
+	public static final RosterProvider NOOP_ROSTER_PROVIDER = new RosterProvider() {
+		private final List<RosterItem> emptyList = Collections.unmodifiableList(new ArrayList<RosterItem>(0));
+		
+		public List<RosterItem> getRoster(KixmppJid userJid) {
+			return emptyList;
+		}
+	};
+	
 	private KixmppServer server;
+	
+	private RosterProvider rosterProvider = NOOP_ROSTER_PROVIDER;
 	
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#install(com.kixeye.kixmpp.server.KixmppServer)
@@ -62,6 +76,20 @@ public class RosterKixmppServerModule implements KixmppServerModule {
 		return null;
 	}
 	
+	/**
+	 * @return the rosterProvider
+	 */
+	public RosterProvider getRosterProvider() {
+		return rosterProvider;
+	}
+
+	/**
+	 * @param rosterProvider the rosterProvider to set
+	 */
+	public void setRosterProvider(RosterProvider rosterProvider) {
+		this.rosterProvider = rosterProvider;
+	}
+
 	private KixmppStanzaHandler ROSTER_HANDLER = new KixmppStanzaHandler() {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
@@ -74,12 +102,38 @@ public class RosterKixmppServerModule implements KixmppServerModule {
 				iq.setAttribute("type", "result");
 				
 				String id = stanza.getAttributeValue("id");
-				
 				if (id != null) {
 					iq.setAttribute("id", id);
 				}
 				
 				Element queryResult = new Element("query", Namespace.getNamespace("jabber:iq:roster"));
+				
+				List<RosterItem> roster = rosterProvider.getRoster(channel.attr(BindKixmppServerModule.JID).get());
+				
+				if (roster != null && !roster.isEmpty()) {
+					for (RosterItem rosterItem : roster) {
+						Element item = new Element("item", queryResult.getNamespace());
+						
+						if (rosterItem.getJid() != null) {
+							item.setAttribute("jid", rosterItem.getJid().getFullJid());
+						}
+						if (rosterItem .getName() != null) {
+							item.setAttribute("name", rosterItem.getName());
+						}
+						if (rosterItem.getSubscription() != null) {
+							item.setAttribute("subscription", rosterItem.getSubscription().name());
+						}
+						if (rosterItem.getGroup() != null) {
+							Element group = new Element("group", item.getNamespace());
+							group.setText(rosterItem.getGroup());
+							
+							item.addContent(group);
+						}
+						
+						queryResult.addContent(item);
+					}
+				}
+				
 				iq.addContent(queryResult);
 				
 				channel.writeAndFlush(iq);
