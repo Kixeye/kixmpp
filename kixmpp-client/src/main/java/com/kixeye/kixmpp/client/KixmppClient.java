@@ -136,9 +136,7 @@ public class KixmppClient implements AutoCloseable {
 	}
 	
 	/**
-	 * Creates a new {@link KixmppClient} with the given ssl engine.
-	 * 
-	 * @param sslContext
+	 * Creates a new {@link KixmppClient}.
 	 */
 	public KixmppClient() {
 		this(new NioEventLoopGroup(), new KixmppEventEngine(), null, Type.TCP);
@@ -154,21 +152,33 @@ public class KixmppClient implements AutoCloseable {
 	}
 	
 	/**
-	 * Creates a new {@link KixmppClient} with the given ssl engine.
+	 * Creates a new {@link KixmppClient} with the given ssl engine with a type.
 	 * 
 	 * @param sslContext
+	 * @param type
 	 */
 	public KixmppClient(SslContext sslContext, Type type) {
 		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext, type);
+	}
+	
+	/**
+	 * Creates a new {@link KixmppClient}.
+	 * 
+	 * @param eventLoopGroup
+	 * @param eventEngine
+	 * @param sslContext
+	 */
+	public KixmppClient(EventLoopGroup eventLoopGroup, KixmppEventEngine eventEngine, SslContext sslContext) {
+		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext, Type.TCP);
 	}
 
 	/**
 	 * Creates a new {@link KixmppClient}.
 	 * 
 	 * @param eventLoopGroup
-	 * @param environment
-	 * @param reactor
+	 * @param eventEngine
 	 * @param sslContext
+	 * @param type
 	 */
 	public KixmppClient(EventLoopGroup eventLoopGroup, KixmppEventEngine eventEngine, SslContext sslContext, Type type) {
 		if (sslContext != null) {
