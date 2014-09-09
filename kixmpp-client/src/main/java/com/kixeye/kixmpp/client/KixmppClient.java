@@ -169,7 +169,7 @@ public class KixmppClient implements AutoCloseable {
 	 * @param sslContext
 	 */
 	public KixmppClient(EventLoopGroup eventLoopGroup, KixmppEventEngine eventEngine, SslContext sslContext) {
-		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext, Type.TCP);
+		this(eventLoopGroup, new KixmppEventEngine(), sslContext, Type.TCP);
 	}
 
 	/**
