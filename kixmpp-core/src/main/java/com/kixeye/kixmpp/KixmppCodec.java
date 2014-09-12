@@ -213,6 +213,9 @@ public class KixmppCodec extends ByteToMessageCodec<Object> {
 				out.writeBytes("<?xml version='1.0' encoding='UTF-8'?>".getBytes(StandardCharsets.UTF_8));
 			}
 			out.writeBytes("<stream:stream ".getBytes(StandardCharsets.UTF_8));
+			if (streamStart.getId() != null) {
+				out.writeBytes(String.format("id=\"%s\" ", streamStart.getId()).getBytes(StandardCharsets.UTF_8));
+			}
 			if (streamStart.getFrom() != null) {
 				out.writeBytes(String.format("from=\"%s\" ", streamStart.getFrom().getFullJid()).getBytes(StandardCharsets.UTF_8));
 			}

@@ -74,7 +74,7 @@ public class FeaturesKixmppServerModule implements KixmppServerModule {
 		public void handleStreamStart(Channel channel, KixmppStreamStart streamStart) {
 			Boolean isAuthed = channel.attr(SaslKixmppServerModule.IS_AUTHENTICATED).get();
 			
-			channel.writeAndFlush(new KixmppStreamStart(new KixmppJid(server.getDomain()), null, isAuthed == null));
+			channel.writeAndFlush(new KixmppStreamStart(new KixmppJid(server.getDomain()), null, isAuthed == null, "" + channel.hashCode()));
 			
 			Element features = new Element("features", "stream", "http://etherx.jabber.org/streams");
 			

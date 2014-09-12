@@ -32,6 +32,19 @@ public class KixmppStreamStart {
 	private final boolean includeXmlHeader;
 	private final KixmppJid from;
 	private final KixmppJid to;
+	private final String id;
+	
+	/**
+	 * @param includeXmlHeader
+	 * @param from
+	 * @param to
+	 */
+	public KixmppStreamStart(KixmppJid from, KixmppJid to, boolean includeXmlHeader, String id) {
+		this.from = from;
+		this.to = to;
+		this.includeXmlHeader = includeXmlHeader;
+		this.id = id;
+	}
 	
 	/**
 	 * @param includeXmlHeader
@@ -39,9 +52,7 @@ public class KixmppStreamStart {
 	 * @param to
 	 */
 	public KixmppStreamStart(KixmppJid from, KixmppJid to, boolean includeXmlHeader) {
-		this.from = from;
-		this.to = to;
-		this.includeXmlHeader = includeXmlHeader;
+		this(from, to, includeXmlHeader, null);
 	}
 
 	/**
@@ -67,9 +78,12 @@ public class KixmppStreamStart {
 			} else {
 				this.to = null;
 			}
+			
+			this.id = element.getAttributeValue("id");
 		} else {
 			this.from = null;
 			this.to = null;
+			this.id = null;
 		}
 	}
 
@@ -92,5 +106,12 @@ public class KixmppStreamStart {
 	 */
 	public boolean doesIncludeXmlHeader() {
 		return includeXmlHeader;
+	}
+
+	/**
+	 * @return the id
+	 */
+	public String getId() {
+		return id;
 	}
 }
