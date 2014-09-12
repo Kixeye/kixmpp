@@ -41,6 +41,8 @@ import com.kixeye.kixmpp.server.module.KixmppServerModule;
  * @author ebahtijaragic
  */
 public class BindKixmppServerModule implements KixmppServerModule {
+	public static AttributeKey<Boolean> IS_BOUND = AttributeKey.valueOf("IS_BOUND");
+	
 	public static AttributeKey<KixmppJid> JID = AttributeKey.valueOf("JID");
 	
 	private KixmppServer server;
@@ -67,9 +69,9 @@ public class BindKixmppServerModule implements KixmppServerModule {
 	public List<Element> getFeatures(Channel channel) {
 		List<Element> features = new LinkedList<>();
 		
-		KixmppJid jid = channel.attr(JID).get();
+		Boolean isBound = channel.attr(IS_BOUND).get();
 		
-		if (jid == null) {
+		if (isBound == null || isBound == false) {
 			Element bind = new Element("bind", null, "urn:ietf:params:xml:ns:xmpp-bind");
 			
 			features.add(bind);
@@ -94,6 +96,8 @@ public class BindKixmppServerModule implements KixmppServerModule {
 				}
 
 				KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get().withResource(resource);
+				
+				channel.attr(BindKixmppServerModule.IS_BOUND).set(true);
 				
 				channel.attr(BindKixmppServerModule.JID).set(jid);
 				

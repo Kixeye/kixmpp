@@ -67,7 +67,7 @@ public class SessionKixmppServerModule implements KixmppServerModule {
 
 		Boolean isSessionEnabled = channel.attr(IS_SESSION_ESTABLISHED).get();
 		
-		if (isSessionEnabled == null) {
+		if (isSessionEnabled == null || isSessionEnabled == false) {
 			Element bind = new Element("session", null, "urn:ietf:params:xml:ns:xmpp-session");
 			
 			features.add(bind);

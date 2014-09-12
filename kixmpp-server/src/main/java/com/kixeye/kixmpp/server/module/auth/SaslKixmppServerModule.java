@@ -74,7 +74,7 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 		
 		Boolean isAuthed = channel.attr(IS_AUTHENTICATED).get();
 		
-		if (isAuthed == null) {
+		if (isAuthed == null || isAuthed == false) {
 			Element mechanisms = new Element("mechanisms", null, "urn:ietf:params:xml:ns:xmpp-sasl");
 			
 			Element plainMechanism = new Element("mechanism", "urn:ietf:params:xml:ns:xmpp-sasl");
