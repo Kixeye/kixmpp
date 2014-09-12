@@ -21,13 +21,13 @@ package com.kixeye.kixmpp.client.module.chat;
  */
 
 /**
- * A listener for private messages.
+ * A listener for messages.
  * 
  * @author ebahtijaragic
  */
 public interface MessageListener {
 	/**
-	 * Handles a private message.
+	 * Handles a message.
 	 * 
 	 * @param message
 	 */

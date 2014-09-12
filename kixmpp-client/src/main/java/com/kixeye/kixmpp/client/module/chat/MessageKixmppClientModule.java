@@ -44,7 +44,7 @@ public class MessageKixmppClientModule implements KixmppClientModule {
 	private static final Logger logger = LoggerFactory.getLogger(MessageKixmppClientModule.class);
 	
 	private Set<MessageListener> messageListeners = Collections.newSetFromMap(new ConcurrentHashMap<MessageListener, Boolean>());
-	
+
 	private KixmppClient client = null;
 	
 	/**

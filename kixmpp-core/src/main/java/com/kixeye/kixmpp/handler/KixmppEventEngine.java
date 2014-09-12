@@ -47,6 +47,8 @@ import com.kixeye.kixmpp.tuple.Tuple;
  * @author ebahtijaragic
  */
 public class KixmppEventEngine {
+	private static final String HANDLER_WILDCARD = "*";
+	
 	private final ConcurrentHashMap<Tuple, Set<KixmppStanzaHandler>> stanzaHandlers = new ConcurrentHashMap<>();
 	private final Set<KixmppConnectionHandler> connectionHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppConnectionHandler, Boolean>());
 	private final Set<KixmppStreamHandler> streamHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStreamHandler, Boolean>());
@@ -88,9 +90,25 @@ public class KixmppEventEngine {
 					queue.execute(new ExecuteStanzaHandler(handler, channel, stanza));
 				}
 			}
+			
+			recipientHandlers = stanzaHandlers.get(Tuple.from(HANDLER_WILDCARD, KixmppJid.fromRawJid(to)));
+			
+			if (recipientHandlers != null) {
+				for (KixmppStanzaHandler handler : recipientHandlers) {
+					queue.execute(new ExecuteStanzaHandler(handler, channel, stanza));
+				}
+			}
 		}
 		
 		Set<KixmppStanzaHandler> globalHandlers = stanzaHandlers.get(Tuple.from(stanza.getQualifiedName()));
+		
+		if (globalHandlers != null) {
+			for (KixmppStanzaHandler handler : globalHandlers) {
+				queue.execute(new ExecuteStanzaHandler(handler, channel, stanza));
+			}
+		}
+		
+		globalHandlers = stanzaHandlers.get(Tuple.from(HANDLER_WILDCARD));
 		
 		if (globalHandlers != null) {
 			for (KixmppStanzaHandler handler : globalHandlers) {
@@ -281,8 +299,16 @@ public class KixmppEventEngine {
 	/**
 	 * Registers a stanza handler.
 	 * 
-	 * @param qualifiedName
 	 * @param jid
+	 * @param handler
+	 */
+	public void registerStanzaHandler(KixmppJid jid, KixmppStanzaHandler handler) {
+		registerStanzaHandler(jid, HANDLER_WILDCARD, handler);
+	}
+	
+	/**
+	 * Registers a stanza handler.
+	 * 
 	 * @param handler
 	 */
 	public void registerGlobalStanzaHandler(String qualifiedName, KixmppStanzaHandler handler) {
@@ -301,6 +327,15 @@ public class KixmppEventEngine {
         }
 		
 		handlers.add(handler);
+	}
+	
+	/**
+	 * Registers a stanza handler.
+	 * 
+	 * @param handler
+	 */
+	public void registerGlobalStanzaHandler(KixmppStanzaHandler handler) {
+		registerGlobalStanzaHandler(HANDLER_WILDCARD, handler);
 	}
 
 	/**
@@ -321,6 +356,16 @@ public class KixmppEventEngine {
 	/**
 	 * Unregisters a stanza handler.
 	 * 
+	 * @param jid
+	 * @param handler
+	 */
+	public void unregisterStanzaHandler(KixmppJid jid, KixmppStanzaHandler handler) {
+		unregisterStanzaHandler(jid, HANDLER_WILDCARD, handler);
+	}
+	
+	/**
+	 * Unregisters a stanza handler.
+	 * 
 	 * @param qualifiedName
 	 * @param handler
 	 */
@@ -330,6 +375,16 @@ public class KixmppEventEngine {
 		if (handlers != null) {
 			handlers.remove(handler);
 		}
+	}
+	
+	/**
+	 * Unregisters a stanza handler.
+	 * 
+	 * @param qualifiedName
+	 * @param handler
+	 */
+	public void unregisterGlobalStanzaHandler(KixmppStanzaHandler handler) {
+		unregisterGlobalStanzaHandler(HANDLER_WILDCARD, handler);
 	}
 	
 	/**

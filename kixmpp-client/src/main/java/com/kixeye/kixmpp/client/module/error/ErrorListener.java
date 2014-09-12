@@ -1,5 +1,4 @@
-package com.kixeye.kixmpp.module;
-
+package com.kixeye.kixmpp.client.module.error;
 
 /*
  * #%L
@@ -21,24 +20,16 @@ package com.kixeye.kixmpp.module;
  * #L%
  */
 
-
 /**
- * Defines a KixmppModule.
+ * A listener for errors.
  * 
  * @author ebahtijaragic
  */
-public interface KixmppModule<T> {
+public interface ErrorListener {
 	/**
-	 * Installs the module.
+	 * Handles a error.
 	 * 
-	 * @param parent
+	 * @param error
 	 */
-	public void install(T parent);
-	
-	/**
-	 * Uninstalls the module.
-	 * 
-	 * @param parent
-	 */
-	public void uninstall(T parent);
+	public void handle(Error message);
 }

@@ -78,6 +78,7 @@ import com.kixeye.kixmpp.KixmppStreamStart;
 import com.kixeye.kixmpp.KixmppWebSocketCodec;
 import com.kixeye.kixmpp.client.module.KixmppClientModule;
 import com.kixeye.kixmpp.client.module.chat.MessageKixmppClientModule;
+import com.kixeye.kixmpp.client.module.error.ErrorKixmppClientModule;
 import com.kixeye.kixmpp.client.module.muc.MucKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
@@ -194,6 +195,7 @@ public class KixmppClient implements AutoCloseable {
 		this.modulesToRegister.add(MucKixmppClientModule.class.getName());
 		this.modulesToRegister.add(PresenceKixmppClientModule.class.getName());
 		this.modulesToRegister.add(MessageKixmppClientModule.class.getName());
+		this.modulesToRegister.add(ErrorKixmppClientModule.class.getName());
 
 		this.bootstrap = new Bootstrap()
 			.group(eventLoopGroup)
