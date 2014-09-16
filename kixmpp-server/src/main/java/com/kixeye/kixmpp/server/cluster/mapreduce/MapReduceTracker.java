@@ -66,7 +66,7 @@ public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.R
     public void onRemoval(RemovalNotification<UUID, MapReduceTracker.RequestWrapper> notification) {
         if (notification.getCause() == RemovalCause.EXPIRED) {
             RequestWrapper wrapper = notification.getValue();
-            log.debug("Timing out MapReduce request <{}> with ref count <{}>", wrapper.getClass().toString(), wrapper.pendingResponseCount.get());
+            log.warn("Timing out MapReduce request <{}> with ref count <{}>", wrapper.getClass().toString(), wrapper.pendingResponseCount.get());
             wrapper.request.onComplete(true);
         }
     }
@@ -98,7 +98,9 @@ public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.R
             wrapper.request.mergeResponse(response);
             if (wrapper.pendingResponseCount.decrementAndGet() == 0) {
                 requests.invalidate(transId);
-                log.debug("Completing MapReduce request <{}> in {} ms", wrapper.getClass().toString(), (System.currentTimeMillis() - wrapper.getStartTime()));
+                if (log.isDebugEnabled()) {
+                    log.debug("Completing MapReduce request <{}> in {} ms", wrapper.getClass().toString(), (System.currentTimeMillis() - wrapper.getStartTime()));
+                }
                 wrapper.request.onComplete(false);
             }
         }
