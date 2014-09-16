@@ -263,7 +263,21 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		
 		this.webSocketAddress = webSocketAddress;
 		
-		this.webSocketBootstrap = new ServerBootstrap()
+		if (this.bootstrap.group() instanceof EpollEventLoopGroup && this.bootstrap.childGroup() instanceof EpollEventLoopGroup) {
+			this.webSocketBootstrap = new ServerBootstrap()
+					.group(this.bootstrap.group(), this.bootstrap.childGroup())
+					.channel(EpollServerSocketChannel.class)
+					.childHandler(new ChannelInitializer<SocketChannel>() {
+						protected void initChannel(SocketChannel ch) throws Exception {
+							ch.pipeline().addLast(new HttpServerCodec());
+							ch.pipeline().addLast(new HttpObjectAggregator(65536));
+							ch.pipeline().addLast(new WebSocketServerHandler());
+							ch.pipeline().addLast(new KixmppWebSocketCodec());
+							ch.pipeline().addLast(new KixmppServerMessageHandler());
+						}
+					});
+		} else {
+			this.webSocketBootstrap = new ServerBootstrap()
 				.group(this.bootstrap.group(), this.bootstrap.childGroup())
 				.channel(NioServerSocketChannel.class)
 				.childHandler(new ChannelInitializer<SocketChannel>() {
@@ -275,6 +289,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 						ch.pipeline().addLast(new KixmppServerMessageHandler());
 					}
 				});
+		}
 		
 		return this;
 	}
