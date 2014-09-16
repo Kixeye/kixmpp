@@ -33,12 +33,16 @@ import com.google.common.cache.RemovalNotification;
 import com.kixeye.kixmpp.server.KixmppServer;
 import com.kixeye.kixmpp.server.cluster.message.MapReduceRequest;
 import com.kixeye.kixmpp.server.cluster.message.MapReduceResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * MapReduceTracker tracks pending MapReduceRequests and completes them when all
  * results are available or they timeout.
  */
 public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.RequestWrapper> {
+    private final Logger log = LoggerFactory.getLogger(MapReduceTracker.class);
+
     private final KixmppServer server;
     private final Cache<UUID,RequestWrapper> requests;
 
@@ -62,14 +66,15 @@ public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.R
     public void onRemoval(RemovalNotification<UUID, MapReduceTracker.RequestWrapper> notification) {
         if (notification.getCause() == RemovalCause.EXPIRED) {
             RequestWrapper wrapper = notification.getValue();
+            log.debug("Timing out MapReduce request <{}> with ref count <{}>", wrapper.getClass().toString(), wrapper.pendingResponseCount.get());
             wrapper.request.onComplete(true);
         }
     }
 
 
     /**
-     * Send MapReduceRequest to all nodes in the cluster, including the
-     * local node.
+     * Send MapReduceRequest to all nodes in the cluster, including
+     * the local node.
      *
      * @param request
      */
@@ -82,7 +87,7 @@ public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.R
 
 
     /**
-     * Process 1 of X responses to a request, possibly completing it.
+     * Process 1 of N responses to a request, possibly completing it.
      *
      * @param response
      */
@@ -93,6 +98,7 @@ public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.R
             wrapper.request.mergeResponse(response);
             if (wrapper.pendingResponseCount.decrementAndGet() == 0) {
                 requests.invalidate(transId);
+                log.debug("Completing MapReduce request <{}> in <{}>ms", wrapper.getClass().toString());
                 wrapper.request.onComplete(false);
             }
         }
@@ -105,10 +111,16 @@ public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.R
     public static class RequestWrapper {
         private MapReduceRequest request;
         private AtomicInteger pendingResponseCount;
+        private long startTime;
 
         public RequestWrapper(MapReduceRequest request, int pendingResponseCount) {
             this.request = request;
             this.pendingResponseCount = new AtomicInteger(pendingResponseCount);
+            this.startTime = System.currentTimeMillis();
+        }
+
+        public long getStartTime() {
+            return startTime;
         }
     }
 }
