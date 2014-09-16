@@ -99,7 +99,7 @@ public class MapReduceTracker implements RemovalListener<UUID,MapReduceTracker.R
             if (wrapper.pendingResponseCount.decrementAndGet() == 0) {
                 requests.invalidate(transId);
                 if (log.isDebugEnabled()) {
-                    log.debug("Completing MapReduce request <{}> in {} ms", wrapper.getClass().toString(), (System.currentTimeMillis() - wrapper.getStartTime()));
+                    log.debug("Completing MapReduce request <{}> in {} ms", wrapper.request.getClass().toString(), (System.currentTimeMillis() - wrapper.getStartTime()));
                 }
                 wrapper.request.onComplete(false);
             }
