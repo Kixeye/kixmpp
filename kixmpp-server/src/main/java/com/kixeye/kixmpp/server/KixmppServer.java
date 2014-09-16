@@ -553,9 +553,8 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
     @SuppressWarnings("unchecked")
 	public Set<Channel> getChannels(String username) {
     	Set<Channel> channels = usernameChannel.get(username);
-    	
     	if (channels != null) {
-    		return Collections.unmodifiableSet(usernameChannel.get(username));
+    		return Collections.unmodifiableSet(channels);
     	} else {
     		return Collections.EMPTY_SET;
     	}
