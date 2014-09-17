@@ -154,7 +154,7 @@ public class MucKixmppClientModule implements KixmppClientModule {
 	 */
 	public void sendRoomMessage(KixmppJid roomJid, String roomMessage, String nickname) {
 		Element message = new Element("message");
-		message.setAttribute("from", roomJid + "/" + nickname);
+		message.setAttribute("from", client.getJid().toString());
 		message.setAttribute("to", roomJid.toString());
 		message.setAttribute("type", "groupchat");
 		

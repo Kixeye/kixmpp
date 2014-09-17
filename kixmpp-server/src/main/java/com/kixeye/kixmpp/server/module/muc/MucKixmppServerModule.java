@@ -25,11 +25,14 @@ import io.netty.channel.Channel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.fusesource.hawtdispatch.Task;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
@@ -43,6 +46,8 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
  * @author ebahtijaragic
  */
 public class MucKixmppServerModule implements KixmppServerModule {
+	private static final Logger logger = LoggerFactory.getLogger(MucKixmppServerModule.class);
+	
 	public static final MucHistoryProvider NOOP_HISTORY_PROVIDER = new MucHistoryProvider() {
 		private final List<MucHistory> emptyList = Collections.unmodifiableList(new ArrayList<MucHistory>(0));
 		
@@ -51,7 +56,9 @@ public class MucKixmppServerModule implements KixmppServerModule {
 			return emptyList;
 		}
 	};
-	
+
+	private Set<MucRoomMessageListener> messageListeners = Collections.newSetFromMap(new ConcurrentHashMap<MucRoomMessageListener, Boolean>());
+
 	private KixmppServer server;
 	
 	private ConcurrentHashMap<String, MucService> services = new ConcurrentHashMap<>();
@@ -74,6 +81,37 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	public void uninstall(KixmppServer server) {
 		this.server.getEventEngine().unregisterGlobalStanzaHandler("presence", JOIN_ROOM_HANDLER);
 		this.server.getEventEngine().unregisterGlobalStanzaHandler("message", ROOM_MESSAGE_HANDLER);
+	}
+	
+	/**
+	 * @param listener the listener to add
+	 */
+	public void addRoomMessageListener(MucRoomMessageListener listener) {
+		messageListeners.add(listener);
+	}
+
+	/**
+	 * @param listener the listener to remove
+	 */
+	public void removeRoomMessageListener(MucRoomMessageListener listener) {
+		messageListeners.remove(listener);
+	}
+	
+	/**
+	 * Publish a message for the listeners to pick up.
+	 * 
+	 * @param room
+	 * @param sender
+	 * @param messages
+	 */
+	protected void publishMessage(MucRoom room, KixmppJid sender, String senderNickname, String... messages) {
+		for (MucRoomMessageListener listener : messageListeners) {
+			try {
+				listener.handle(room, sender, senderNickname, messages);
+			} catch (Exception e) {
+				logger.error("Error while invoking listener: [{}].", listener, e);
+			}
+		}
 	}
 	
 	/**

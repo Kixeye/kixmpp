@@ -345,6 +345,8 @@ public class MucRoom {
         String fromNickname = nicknamesByBareJid.get(fromAddress.withoutResource());
         //TODO validate fromAddress is roomJid or is a member of the room
         KixmppJid fromRoomJid = roomJid.withoutResource().withResource(fromNickname);
+        
+        mucModule.publishMessage(this, fromRoomJid, fromNickname, messages);
 
         for (User to : usersByNickname.values()) {
             MucRole toRole = jidRoles.get(to.bareJid.withoutResource());
@@ -361,13 +363,17 @@ public class MucRoom {
         }
         
         if (sendToCluster) {
-            service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromRoomJid, messages), false);
+            service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromRoomJid, fromNickname, messages), false);
         }
     }
 
-    public void receive(KixmppJid fromAddress, String... messages) {
+    public void receive(KixmppJid fromAddress, String nickname, String... messages) {
+        mucModule.publishMessage(this, fromAddress, nickname, messages);
+
+        KixmppJid fromRoomJid = roomJid.withoutResource().withResource(nickname);
+        
         for (User to : usersByNickname.values()) {
-            to.receiveMessages(fromAddress, messages);
+            to.receiveMessages(fromRoomJid, messages);
         }
     }
 

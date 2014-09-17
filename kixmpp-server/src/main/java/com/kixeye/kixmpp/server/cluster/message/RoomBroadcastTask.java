@@ -27,19 +27,21 @@ import com.kixeye.kixmpp.server.module.muc.MucRoom;
 public class RoomBroadcastTask extends RoomTask {
 
     private KixmppJid from;
+    private String nickname;
     private String[] messages;
 
     public RoomBroadcastTask() {
     }
 
-    public RoomBroadcastTask(MucRoom room, String gameId, String roomId, KixmppJid from, String...messages) {
+    public RoomBroadcastTask(MucRoom room, String gameId, String roomId, KixmppJid from, String nickname, String...messages) {
         super(room,gameId,roomId);
         this.from = from;
+        this.nickname = nickname;
         this.messages = messages;
     }
 
     @Override
     public void run() {
-        getRoom().receive(from, messages);
+        getRoom().receive(from, nickname, messages);
     }
 }
