@@ -11,8 +11,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -116,6 +117,8 @@ import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
 public class KixmppServer implements AutoCloseable, ClusterListener {
 	private static final Logger logger = LoggerFactory.getLogger(KixmppServer.class);
 	
+	private static String OS = System.getProperty("os.name").toLowerCase();
+	
 	public static final InetSocketAddress DEFAULT_SOCKET_ADDRESS = new InetSocketAddress(5222);
 	public static final InetSocketAddress DEFAULT_WEBSOCKET_ADDRESS = new InetSocketAddress(5290);
     public static final InetSocketAddress DEFAULT_CLUSTER_ADDRESS = new InetSocketAddress(8100);
@@ -168,7 +171,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 * @param domain
 	 */
 	public KixmppServer(String domain) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), DEFAULT_SOCKET_ADDRESS, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery() );
+		this(DEFAULT_SOCKET_ADDRESS, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery() );
 	}
 	
 	/**
@@ -178,7 +181,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 * @param domain
 	 */
 	public KixmppServer(InetSocketAddress bindAddress, String domain) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), bindAddress, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery());
+		this(bindAddress, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery());
 	}
 	
 	/**
@@ -188,27 +191,37 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 * @param domain
 	 */
 	public KixmppServer(InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery) {
-		this(new NioEventLoopGroup(), new NioEventLoopGroup(), new KixmppEventEngine(), bindAddress, domain, clusterAddress, clusterDiscovery );
+		this(bindAddress, domain, clusterAddress, clusterDiscovery, true);
 	}
 	
 	/**
-	 * Creates a new {@link KixmppServer}.
+	 * Creates a new {@link KixmppServer} with the given ssl engine.
 	 * 
-	 * @param workerGroup
-	 * @param eventEngine
 	 * @param bindAddress
 	 * @param domain
 	 */
-	public KixmppServer(EventLoopGroup workerGroup, EventLoopGroup bossGroup, KixmppEventEngine eventEngine, InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery) {
-		this.bootstrap = new ServerBootstrap()
-			.group(bossGroup, workerGroup)
-			.channel(NioServerSocketChannel.class)
-			.childHandler(new ChannelInitializer<SocketChannel>() {
-				protected void initChannel(SocketChannel ch) throws Exception {
-					ch.pipeline().addLast(new KixmppCodec());
-					ch.pipeline().addLast(new KixmppServerMessageHandler());
-				}
-			});
+	public KixmppServer(InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery, boolean useEpollIfAvailable) {
+		if (useEpollIfAvailable && OS.indexOf("nux") >= 0) {
+			this.bootstrap = new ServerBootstrap()
+				.group(new EpollEventLoopGroup(), new EpollEventLoopGroup())
+				.channel(EpollServerSocketChannel.class)
+				.childHandler(new ChannelInitializer<SocketChannel>() {
+					protected void initChannel(SocketChannel ch) throws Exception {
+						ch.pipeline().addLast(new KixmppCodec());
+						ch.pipeline().addLast(new KixmppServerMessageHandler());
+					}
+				});
+		} else {
+			this.bootstrap = new ServerBootstrap()
+				.group(new NioEventLoopGroup(), new NioEventLoopGroup())
+				.channel(NioServerSocketChannel.class)
+				.childHandler(new ChannelInitializer<SocketChannel>() {
+					protected void initChannel(SocketChannel ch) throws Exception {
+						ch.pipeline().addLast(new KixmppCodec());
+						ch.pipeline().addLast(new KixmppServerMessageHandler());
+					}
+				});
+		}
 
 		this.scheduledExecutorService = Executors.newScheduledThreadPool( Runtime.getRuntime().availableProcessors() );
         this.cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, bossGroup, workerGroup, scheduledExecutorService );
@@ -218,7 +231,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 
 		this.bindAddress = bindAddress;
 		this.domain = domain.toLowerCase();
-		this.eventEngine = eventEngine;
+		this.eventEngine = new KixmppEventEngine();
 
 		this.modulesToRegister.add(FeaturesKixmppServerModule.class.getName());
 		this.modulesToRegister.add(SaslKixmppServerModule.class.getName());
@@ -250,7 +263,21 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		
 		this.webSocketAddress = webSocketAddress;
 		
-		this.webSocketBootstrap = new ServerBootstrap()
+		if (this.bootstrap.group() instanceof EpollEventLoopGroup && this.bootstrap.childGroup() instanceof EpollEventLoopGroup) {
+			this.webSocketBootstrap = new ServerBootstrap()
+					.group(this.bootstrap.group(), this.bootstrap.childGroup())
+					.channel(EpollServerSocketChannel.class)
+					.childHandler(new ChannelInitializer<SocketChannel>() {
+						protected void initChannel(SocketChannel ch) throws Exception {
+							ch.pipeline().addLast(new HttpServerCodec());
+							ch.pipeline().addLast(new HttpObjectAggregator(65536));
+							ch.pipeline().addLast(new WebSocketServerHandler());
+							ch.pipeline().addLast(new KixmppWebSocketCodec());
+							ch.pipeline().addLast(new KixmppServerMessageHandler());
+						}
+					});
+		} else {
+			this.webSocketBootstrap = new ServerBootstrap()
 				.group(this.bootstrap.group(), this.bootstrap.childGroup())
 				.channel(NioServerSocketChannel.class)
 				.childHandler(new ChannelInitializer<SocketChannel>() {
@@ -262,6 +289,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 						ch.pipeline().addLast(new KixmppServerMessageHandler());
 					}
 				});
+		}
 		
 		return this;
 	}
