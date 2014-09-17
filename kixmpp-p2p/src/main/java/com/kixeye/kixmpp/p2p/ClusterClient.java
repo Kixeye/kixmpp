@@ -20,35 +20,28 @@ package com.kixeye.kixmpp.p2p;
  * #L%
  */
 
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.nio.NioEventLoopGroup;
-
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
 import com.kixeye.kixmpp.p2p.listener.ClusterListener;
 import com.kixeye.kixmpp.p2p.message.JoinRequest;
 import com.kixeye.kixmpp.p2p.message.JoinResponse;
 import com.kixeye.kixmpp.p2p.message.MessageRegistry;
 import com.kixeye.kixmpp.p2p.message.MessageWrapper;
-import com.kixeye.kixmpp.p2p.node.LocalNode;
-import com.kixeye.kixmpp.p2p.node.Node;
-import com.kixeye.kixmpp.p2p.node.NodeAddress;
-import com.kixeye.kixmpp.p2p.node.NodeId;
-import com.kixeye.kixmpp.p2p.node.NodeServer;
-import com.kixeye.kixmpp.p2p.node.RemoteNode;
+import com.kixeye.kixmpp.p2p.node.*;
 import com.kixeye.kixmpp.p2p.util.Net;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.nio.NioEventLoopGroup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * ClusterClient maintains a list of Zaqar peer-to-peer connections.
@@ -59,7 +52,7 @@ public class ClusterClient {
     private final Node localNode;
     private final NodeServer server;
     private final MessageRegistry messageRegistry = new MessageRegistry();
-    private final ScheduledExecutorService executorService;
+    private final ExecutorService executorService;
     private final ScheduledFuture<?> pollingTask;
     private final NioEventLoopGroup bossGroup;
     private final NioEventLoopGroup workerGroup;
@@ -73,7 +66,7 @@ public class ClusterClient {
     private NodeDiscovery discovery;
     private ClusterListener listener;
 
-    public ClusterClient(ClusterListener listener, String hostAddress, int hostPort, NodeDiscovery discovery, long msPollingTime, ScheduledExecutorService executorService) {
+    public ClusterClient(ClusterListener listener, String hostAddress, int hostPort, NodeDiscovery discovery, long msPollingTime, ExecutorService executorService) {
         this.listener = listener;
         this.discovery = discovery;
         this.executorService = executorService;
@@ -95,7 +88,7 @@ public class ClusterClient {
         server.initialize(hostAddress, hostPort, bossGroup, workerGroup, messageRegistry, new ServerChannelHandler());
 
         // schedule polling task
-        pollingTask = executorService.scheduleWithFixedDelay( new Runnable() {
+        pollingTask = workerGroup.scheduleWithFixedDelay( new Runnable() {
             @Override
             public void run() {
                 pollForNodes();
