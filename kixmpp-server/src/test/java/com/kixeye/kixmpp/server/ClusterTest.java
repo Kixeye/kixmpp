@@ -100,7 +100,7 @@ public class ClusterTest {
             if (cluster.getNodeCount() == 2) {
                 break;
             }
-            if (i > 20) {
+            if (i > 10) {
                 Assert.fail("cluster failed to form!");
                 break;
             }

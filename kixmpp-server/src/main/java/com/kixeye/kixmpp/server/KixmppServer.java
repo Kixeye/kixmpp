@@ -201,7 +201,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 * @param domain
 	 */
 	public KixmppServer(InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery, boolean useEpollIfAvailable) {
-		if (false/*useEpollIfAvailable && OS.indexOf("nux") >= 0*/) {
+		if (useEpollIfAvailable && OS.indexOf("nux") >= 0) {
 			this.bootstrap = new ServerBootstrap()
 				.group(new EpollEventLoopGroup(), new EpollEventLoopGroup())
 				.channel(EpollServerSocketChannel.class)
@@ -224,7 +224,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		}
 
 		this.scheduledExecutorService = Executors.newScheduledThreadPool( Runtime.getRuntime().availableProcessors() );
-        this.cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, bootstrap.group(), bootstrap.childGroup(), scheduledExecutorService );
+        this.cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, scheduledExecutorService );
         this.cluster.getMessageRegistry().addCustomMessage(1, RoomBroadcastTask.class);
         this.mapReduce = new MapReduceTracker(this, scheduledExecutorService);
         this.channels = new DefaultChannelGroup("All Channels", GlobalEventExecutor.INSTANCE);
