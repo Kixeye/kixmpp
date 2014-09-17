@@ -191,7 +191,7 @@ public class KixmppClient implements AutoCloseable {
 		}
 		
 		if (eventLoopGroup == null) {
-			if (OS.indexOf("nux") >= 0) {
+			if (false/*OS.indexOf("nux") >= 0*/) {
 				eventLoopGroup = new EpollEventLoopGroup();
 			} else {
 				eventLoopGroup = new NioEventLoopGroup();
