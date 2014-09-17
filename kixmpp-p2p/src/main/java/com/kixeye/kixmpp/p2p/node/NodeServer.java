@@ -26,6 +26,8 @@ import com.kixeye.kixmpp.p2p.serialization.ProtostuffDecoder;
 import com.kixeye.kixmpp.p2p.serialization.ProtostuffEncoder;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
@@ -47,7 +49,11 @@ public class NodeServer {
             final ChannelInboundHandlerAdapter channelListener) {
         ServerBootstrap boot = new ServerBootstrap();
         boot.group(bossGroup,workerGroup);
-        boot.channel(NioServerSocketChannel.class);
+        if (bossGroup instanceof EpollEventLoopGroup && workerGroup instanceof EpollEventLoopGroup) {
+            boot.channel(EpollServerSocketChannel.class);
+        } else {
+            boot.channel(NioServerSocketChannel.class);
+        }
         boot.option(ChannelOption.SO_BACKLOG, 32);
         boot.childOption(ChannelOption.SO_KEEPALIVE, true);
         boot.childOption(ChannelOption.TCP_NODELAY,true);
@@ -76,7 +82,7 @@ public class NodeServer {
             if (host == null) {
                 acceptChannel = boot.bind(port).sync().channel();
             } else {
-                acceptChannel = boot.bind(host, port).sync().channel();
+                acceptChannel = boot.bind(host,port).sync().channel();
             }
 
     		logger.info("NodeServer listening on [{}]...", port);
@@ -88,7 +94,9 @@ public class NodeServer {
 
     public void shutdown() {
         try {
-            acceptChannel.close().sync();
+            if (acceptChannel != null) {
+                acceptChannel.close().sync();
+            }
         } catch (Exception ex) {
             logger.error("Exception shutting down NodeServer", ex);
         }
