@@ -25,7 +25,6 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -510,8 +509,8 @@ public class MucRoom {
     public class User {
         private String nickname;
         private KixmppJid bareJid;
-        private Map<Channel, Client> clientsByChannel = new HashMap<>();
-        private Map<KixmppJid, Client> clientsByAddress = new HashMap<>();
+        private Map<Channel, Client> clientsByChannel = new ConcurrentHashMap<>();
+        private Map<KixmppJid, Client> clientsByAddress = new ConcurrentHashMap<>();
 
         public User(String nickname, KixmppJid bareJid) {
             this.nickname = nickname;
