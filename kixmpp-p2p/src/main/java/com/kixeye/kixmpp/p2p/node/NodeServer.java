@@ -56,7 +56,7 @@ public class NodeServer {
         }
         boot.option(ChannelOption.SO_BACKLOG, 32);
         boot.childOption(ChannelOption.SO_KEEPALIVE, true);
-        boot.childOption(ChannelOption.TCP_NODELAY,true);
+        boot.childOption(ChannelOption.TCP_NODELAY, true);
         boot.childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             public void initChannel(SocketChannel ch) throws Exception {
