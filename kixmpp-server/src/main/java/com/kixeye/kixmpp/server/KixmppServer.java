@@ -1,69 +1,9 @@
 package com.kixeye.kixmpp.server;
 
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPromise;
-import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollServerSocketChannel;
-import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.WebSocketFrame;
-import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
-import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
-import io.netty.util.CharsetUtil;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
-import io.netty.util.concurrent.GlobalEventExecutor;
-
-import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-
-import org.fusesource.hawtdispatch.Task;
-import org.jdom2.Element;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Striped;
-import com.kixeye.kixmpp.KixmppCodec;
-import com.kixeye.kixmpp.KixmppJid;
-import com.kixeye.kixmpp.KixmppStanzaRejectedException;
-import com.kixeye.kixmpp.KixmppStreamEnd;
-import com.kixeye.kixmpp.KixmppStreamStart;
-import com.kixeye.kixmpp.KixmppWebSocketCodec;
+import com.kixeye.kixmpp.*;
 import com.kixeye.kixmpp.handler.KixmppEventEngine;
 import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
 import com.kixeye.kixmpp.p2p.ClusterClient;
@@ -72,11 +12,7 @@ import com.kixeye.kixmpp.p2p.discovery.NodeDiscovery;
 import com.kixeye.kixmpp.p2p.listener.ClusterListener;
 import com.kixeye.kixmpp.p2p.node.NodeId;
 import com.kixeye.kixmpp.server.cluster.mapreduce.MapReduceTracker;
-import com.kixeye.kixmpp.server.cluster.message.ClusterTask;
-import com.kixeye.kixmpp.server.cluster.message.MapReduceRequest;
-import com.kixeye.kixmpp.server.cluster.message.MapReduceResponse;
-import com.kixeye.kixmpp.server.cluster.message.RoomBroadcastTask;
-import com.kixeye.kixmpp.server.cluster.message.RoomTask;
+import com.kixeye.kixmpp.server.cluster.message.*;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
@@ -89,6 +25,36 @@ import com.kixeye.kixmpp.server.module.muc.MucService;
 import com.kixeye.kixmpp.server.module.presence.PresenceKixmppServerModule;
 import com.kixeye.kixmpp.server.module.roster.RosterKixmppServerModule;
 import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.*;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.websocketx.*;
+import io.netty.util.CharsetUtil;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.GlobalEventExecutor;
+import org.fusesource.hawtdispatch.Task;
+import org.jdom2.Element;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.InetSocketAddress;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 /*
  * #%L
  * KIXMPP
@@ -163,7 +129,6 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 
     private final ClusterClient cluster;
     private final MapReduceTracker mapReduce;
-    private final ScheduledExecutorService scheduledExecutorService;
 
     /**
 	 * Creates a new {@link KixmppServer} with the given ssl engine.
@@ -223,10 +188,9 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 				});
 		}
 
-		this.scheduledExecutorService = Executors.newScheduledThreadPool( Runtime.getRuntime().availableProcessors() );
-        this.cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, scheduledExecutorService );
+        this.cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, bootstrap.group() );
         this.cluster.getMessageRegistry().addCustomMessage(1, RoomBroadcastTask.class);
-        this.mapReduce = new MapReduceTracker(this, scheduledExecutorService);
+        this.mapReduce = new MapReduceTracker(this, bootstrap.group());
         this.channels = new DefaultChannelGroup("All Channels", GlobalEventExecutor.INSTANCE);
 
 		this.bindAddress = bindAddress;
@@ -383,8 +347,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 
         // shutdown clustering
         cluster.shutdown();
-        scheduledExecutorService.shutdown();
-		
+
 		for (Entry<String, KixmppServerModule> entry : modules.entrySet()) {
 			entry.getValue().uninstall(this);
 		}
