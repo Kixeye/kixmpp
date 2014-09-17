@@ -201,6 +201,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	 * @param domain
 	 */
 	public KixmppServer(InetSocketAddress bindAddress, String domain, InetSocketAddress clusterAddress, NodeDiscovery clusterDiscovery, boolean useEpollIfAvailable) {
+        useEpollIfAvailable = false;
 		if (useEpollIfAvailable && OS.indexOf("nux") >= 0) {
 			this.bootstrap = new ServerBootstrap()
 				.group(new EpollEventLoopGroup(), new EpollEventLoopGroup())
