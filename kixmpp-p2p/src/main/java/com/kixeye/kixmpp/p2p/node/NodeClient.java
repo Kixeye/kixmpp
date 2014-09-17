@@ -25,6 +25,8 @@ import com.kixeye.kixmpp.p2p.serialization.ProtostuffDecoder;
 import com.kixeye.kixmpp.p2p.serialization.ProtostuffEncoder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
@@ -45,7 +47,11 @@ public class NodeClient {
         // prepare connection
         Bootstrap boot = new Bootstrap();
         boot.group(workerGroup);
-        boot.channel(NioSocketChannel.class);
+        if (workerGroup instanceof EpollEventLoopGroup) {
+            boot.channel(EpollSocketChannel.class);
+        } else {
+            boot.channel(NioSocketChannel.class);
+        }
         boot.option(ChannelOption.SO_KEEPALIVE,true);
         boot.option(ChannelOption.TCP_NODELAY,true);
         boot.handler( new ChannelInitializer<SocketChannel>() {
