@@ -32,6 +32,8 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -92,6 +94,8 @@ import com.kixeye.kixmpp.interceptor.KixmppStanzaInterceptor;
  */
 public class KixmppClient implements AutoCloseable {
 	private static final Logger logger = LoggerFactory.getLogger(KixmppClient.class);
+
+	private static String OS = System.getProperty("os.name").toLowerCase();
 	
 	public enum Type {
 		TCP,
@@ -140,7 +144,7 @@ public class KixmppClient implements AutoCloseable {
 	 * Creates a new {@link KixmppClient}.
 	 */
 	public KixmppClient() {
-		this(new NioEventLoopGroup(), new KixmppEventEngine(), null, Type.TCP);
+		this(null);
 	}
 	
 	/**
@@ -149,7 +153,7 @@ public class KixmppClient implements AutoCloseable {
 	 * @param sslContext
 	 */
 	public KixmppClient(SslContext sslContext) {
-		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext, Type.TCP);
+		this(sslContext, Type.TCP);
 	}
 	
 	/**
@@ -159,7 +163,7 @@ public class KixmppClient implements AutoCloseable {
 	 * @param type
 	 */
 	public KixmppClient(SslContext sslContext, Type type) {
-		this(new NioEventLoopGroup(), new KixmppEventEngine(), sslContext, type);
+		this(null, new KixmppEventEngine(), sslContext, type);
 	}
 	
 	/**
@@ -186,6 +190,14 @@ public class KixmppClient implements AutoCloseable {
 			assert sslContext.isClient() : "The given SslContext must be a client context.";
 		}
 		
+		if (eventLoopGroup == null) {
+			if (OS.indexOf("nux") >= 0) {
+				eventLoopGroup = new EpollEventLoopGroup();
+			} else {
+				eventLoopGroup = new NioEventLoopGroup();
+			}
+		}
+		
 		this.type = type;
 		
 		this.sslContext = sslContext;
@@ -197,11 +209,19 @@ public class KixmppClient implements AutoCloseable {
 		this.modulesToRegister.add(MessageKixmppClientModule.class.getName());
 		this.modulesToRegister.add(ErrorKixmppClientModule.class.getName());
 
-		this.bootstrap = new Bootstrap()
-			.group(eventLoopGroup)
-			.channel(NioSocketChannel.class)
-			.option(ChannelOption.TCP_NODELAY, false)
-			.option(ChannelOption.SO_KEEPALIVE, true);
+		if (eventLoopGroup instanceof EpollEventLoopGroup) {
+			this.bootstrap = new Bootstrap()
+				.group(eventLoopGroup)
+				.channel(EpollSocketChannel.class)
+				.option(ChannelOption.TCP_NODELAY, false)
+				.option(ChannelOption.SO_KEEPALIVE, true);
+		} else {
+			this.bootstrap = new Bootstrap()
+				.group(eventLoopGroup)
+				.channel(NioSocketChannel.class)
+				.option(ChannelOption.TCP_NODELAY, false)
+				.option(ChannelOption.SO_KEEPALIVE, true);
+		}
 		
 		switch (type) {
 			case TCP:
