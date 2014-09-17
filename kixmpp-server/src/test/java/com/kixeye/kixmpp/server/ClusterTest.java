@@ -35,13 +35,17 @@ import com.kixeye.kixmpp.p2p.node.NodeAddress;
 import com.kixeye.kixmpp.server.module.auth.InMemoryAuthenticationService;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
+import com.kixeye.kixmpp.server.utils.SocketUtils;
+
 import io.netty.handler.ssl.SslContext;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLException;
+
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -50,10 +54,10 @@ import java.util.concurrent.TimeoutException;
 
 
 public class ClusterTest {
-    public static final InetSocketAddress SERVER_A_SOCKET = new InetSocketAddress(5222);
-    public static final InetSocketAddress SERVER_B_SOCKET = new InetSocketAddress(5223);
-    public static final InetSocketAddress SERVER_A_CLUSTER = new InetSocketAddress("127.0.0.1",8100);
-    public static final InetSocketAddress SERVER_B_CLUSTER = new InetSocketAddress("127.0.0.1",8200);
+    public static final InetSocketAddress SERVER_A_SOCKET = new InetSocketAddress(SocketUtils.findAvailableTcpPort());
+    public static final InetSocketAddress SERVER_B_SOCKET = new InetSocketAddress(SocketUtils.findAvailableTcpPort());
+    public static final InetSocketAddress SERVER_A_CLUSTER = new InetSocketAddress("127.0.0.1",SocketUtils.findAvailableTcpPort());
+    public static final InetSocketAddress SERVER_B_CLUSTER = new InetSocketAddress("127.0.0.1",SocketUtils.findAvailableTcpPort());
     public static final ConstNodeDiscovery discovery = new ConstNodeDiscovery(
             new NodeAddress(SERVER_A_CLUSTER.getHostName(), SERVER_A_CLUSTER.getPort()),
             new NodeAddress(SERVER_B_CLUSTER.getHostName(), SERVER_B_CLUSTER.getPort())

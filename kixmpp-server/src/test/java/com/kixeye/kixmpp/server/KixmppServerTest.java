@@ -22,6 +22,7 @@ package com.kixeye.kixmpp.server;
 
 import io.netty.handler.ssl.SslContext;
 
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -50,11 +51,13 @@ import com.kixeye.kixmpp.client.module.muc.MucMessage;
 import com.kixeye.kixmpp.client.module.presence.Presence;
 import com.kixeye.kixmpp.client.module.presence.PresenceKixmppClientModule;
 import com.kixeye.kixmpp.client.module.presence.PresenceListener;
+import com.kixeye.kixmpp.p2p.discovery.ConstNodeDiscovery;
 import com.kixeye.kixmpp.server.module.auth.InMemoryAuthenticationService;
 import com.kixeye.kixmpp.server.module.auth.SaslKixmppServerModule;
 import com.kixeye.kixmpp.server.module.muc.MucHistory;
 import com.kixeye.kixmpp.server.module.muc.MucHistoryProvider;
 import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
+import com.kixeye.kixmpp.server.utils.SocketUtils;
 
 /**
  * Tests the {@link KixmppServer}
@@ -64,7 +67,8 @@ import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
 public class KixmppServerTest {
 	@Test
 	public void testUserMapping() throws Exception {
-		try (KixmppServer server = new KixmppServer("testChat")) {
+		try (KixmppServer server = new KixmppServer(new InetSocketAddress(SocketUtils.findAvailableTcpPort()), "testChat",
+				new InetSocketAddress(SocketUtils.findAvailableTcpPort()), new ConstNodeDiscovery())) {
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
 
 			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
@@ -119,7 +123,8 @@ public class KixmppServerTest {
 	
 	@Test
 	public void testPrivateMessageUsingKixmpp() throws Exception {
-		try (KixmppServer server = new KixmppServer("testChat")) {
+		try (KixmppServer server = new KixmppServer(new InetSocketAddress(SocketUtils.findAvailableTcpPort()), "testChat",
+				new InetSocketAddress(SocketUtils.findAvailableTcpPort()), new ConstNodeDiscovery())) {
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
 
 			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser1", "testPassword");
@@ -194,7 +199,8 @@ public class KixmppServerTest {
 
 	@Test
 	public void testSimpleUsingKixmpp() throws Exception {
-		try (KixmppServer server = new KixmppServer("testChat")) {
+		try (KixmppServer server = new KixmppServer(new InetSocketAddress(SocketUtils.findAvailableTcpPort()), "testChat",
+				new InetSocketAddress(SocketUtils.findAvailableTcpPort()), new ConstNodeDiscovery())) {
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
 
 			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
@@ -253,7 +259,8 @@ public class KixmppServerTest {
 	
 	@Test
 	public void testSimpleUsingKixmppWithWebSocket() throws Exception {
-		try (KixmppServer server = new KixmppServer("testChat")) {
+		try (KixmppServer server = new KixmppServer(new InetSocketAddress(SocketUtils.findAvailableTcpPort()), "testChat",
+				new InetSocketAddress(SocketUtils.findAvailableTcpPort()), new ConstNodeDiscovery())) {
 			server.enableWebSocket();
 			
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
@@ -314,7 +321,8 @@ public class KixmppServerTest {
 	
 	@Test
 	public void testSimpleUsingKixmppWithHistory() throws Exception {
-		try (KixmppServer server = new KixmppServer("testChat")) {
+		try (KixmppServer server = new KixmppServer(new InetSocketAddress(SocketUtils.findAvailableTcpPort()), "testChat",
+				new InetSocketAddress(SocketUtils.findAvailableTcpPort()), new ConstNodeDiscovery())) {
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
 
 			((InMemoryAuthenticationService) server.module(SaslKixmppServerModule.class).getAuthenticationService()).addUser("testUser", "testPassword");
@@ -387,7 +395,8 @@ public class KixmppServerTest {
 
 	@Test
 	public void testSimpleUsingSmack() throws Exception {
-		try (KixmppServer server = new KixmppServer("testChat")) {
+		try (KixmppServer server = new KixmppServer(new InetSocketAddress(SocketUtils.findAvailableTcpPort()), "testChat",
+				new InetSocketAddress(SocketUtils.findAvailableTcpPort()), new ConstNodeDiscovery())) {
 			Assert.assertNotNull(server.start().get(2, TimeUnit.SECONDS));
 
 			((InMemoryAuthenticationService) server.module(
