@@ -35,6 +35,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -150,6 +152,15 @@ public class ClusterClient {
             node.sendMessage(wrapper);
         }
         wrapper.release();
+    }
+
+
+    /**
+     * Get cluster node ids.
+     * @return
+     */
+    public List<NodeId> getNodeIds() {
+        return new ArrayList<>(idToNode.keySet());
     }
 
 
