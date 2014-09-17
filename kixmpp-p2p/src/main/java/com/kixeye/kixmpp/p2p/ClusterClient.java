@@ -156,11 +156,20 @@ public class ClusterClient {
 
 
     /**
-     * Get cluster node ids.
+     * [DEBUG] - Get cluster nodes.
      * @return
      */
-    public List<NodeId> getNodeIds() {
-        return new ArrayList<>(idToNode.keySet());
+    public List<Node> getNodes() {
+        return new ArrayList<>(idToNode.values());
+    }
+
+
+    /**
+     * [DEBUG] - Get local node
+     * @return
+     */
+    public Node getLocalNode() {
+        return localNode;
     }
 
 
