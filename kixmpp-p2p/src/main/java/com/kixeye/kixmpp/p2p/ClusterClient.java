@@ -23,6 +23,7 @@ package com.kixeye.kixmpp.p2p;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 
 import java.util.List;
@@ -61,8 +62,10 @@ public class ClusterClient {
     private final MessageRegistry messageRegistry = new MessageRegistry();
     private final ScheduledExecutorService executorService;
     private final ScheduledFuture<?> pollingTask;
-    private final NioEventLoopGroup bossGroup;
-    private final NioEventLoopGroup workerGroup;
+    private final EventLoopGroup bossGroup;
+    private final boolean ownBossGroup;
+    private final EventLoopGroup workerGroup;
+    private final boolean ownWorkerGroup;
     private final Object joinLock = new Object();
 
     // node maps
@@ -73,12 +76,24 @@ public class ClusterClient {
     private NodeDiscovery discovery;
     private ClusterListener listener;
 
-    public ClusterClient(ClusterListener listener, String hostAddress, int hostPort, NodeDiscovery discovery, long msPollingTime, ScheduledExecutorService executorService) {
+    public ClusterClient(ClusterListener listener, String hostAddress, int hostPort, NodeDiscovery discovery, long msPollingTime, EventLoopGroup bossEventGroup, EventLoopGroup workerEventGroup, ScheduledExecutorService executorService) {
         this.listener = listener;
         this.discovery = discovery;
         this.executorService = executorService;
-        this.bossGroup = new NioEventLoopGroup();
-        this.workerGroup = new NioEventLoopGroup();
+        if (bossEventGroup != null) {
+            this.bossGroup = bossEventGroup;
+            this.ownBossGroup = false;
+        } else {
+            this.bossGroup = new NioEventLoopGroup();
+            this.ownBossGroup = true;
+        }
+        if (workerEventGroup != null) {
+            this.workerGroup = workerEventGroup;
+            this.ownWorkerGroup = false;
+        } else {
+            this.workerGroup = new NioEventLoopGroup();
+            this.ownWorkerGroup = true;
+        }
 
         // create local node
         NodeAddress localAddr;
@@ -197,8 +212,12 @@ public class ClusterClient {
         }
         idToNode.clear();
         addrToNode.clear();
-        bossGroup.shutdownGracefully();
-        workerGroup.shutdownGracefully();
+        if (ownBossGroup) {
+            bossGroup.shutdownGracefully();
+        }
+        if (ownWorkerGroup) {
+            workerGroup.shutdownGracefully();
+        }
 
         // break dependencies
         listener = null;

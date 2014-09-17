@@ -124,9 +124,9 @@ public class NodeServerTest {
         final JoinCountClusterListener listenerB = new JoinCountClusterListener();
         final JoinCountClusterListener listenerC = new JoinCountClusterListener();
 
-        final ClusterClient repA = new ClusterClient(listenerA,localhost, 8000, discovery, 2000, Executors.newSingleThreadScheduledExecutor());
-        final ClusterClient repB = new ClusterClient(listenerB,localhost, 8001, discovery, 2000, Executors.newSingleThreadScheduledExecutor());
-        final ClusterClient repC = new ClusterClient(listenerC,localhost, 8002, discovery, 2000, Executors.newSingleThreadScheduledExecutor());
+        final ClusterClient repA = new ClusterClient(listenerA,localhost, 8000, discovery, 2000, null, null, Executors.newSingleThreadScheduledExecutor());
+        final ClusterClient repB = new ClusterClient(listenerB,localhost, 8001, discovery, 2000, null, null, Executors.newSingleThreadScheduledExecutor());
+        final ClusterClient repC = new ClusterClient(listenerC,localhost, 8002, discovery, 2000, null, null, Executors.newSingleThreadScheduledExecutor());
         try {
             // spin until 3 nodes are found
             for (int i = 0; i < 10; i++) {
