@@ -26,25 +26,28 @@ package com.kixeye.kixmpp.server.module.muc;
  * @author dturner@kixeye.com
  */
 public class MucRoomSettings {
-
     private boolean isOpen = true;
     private String subject = null;
+    
+    public MucRoomSettings(boolean isOpen, String subject) {
+		this.isOpen = isOpen;
+		this.subject = subject;
+	}
 
     public MucRoomSettings(MucRoomSettings settings) {
-    	isOpen = settings.isOpen();
+    	this.isOpen = settings.isOpen;
+    	this.subject = settings.subject;
+    }
+    
+	public MucRoomSettings() {
     }
 
-    public MucRoomSettings() {
-    }
-
-    public MucRoomSettings isOpen(boolean isOpen){
+    public void setOpen(boolean isOpen){
         this.isOpen = isOpen;
-        return this;
     }
 
-    public MucRoomSettings subject(String subject){
+    public void setSubject(String subject){
         this.subject = subject;
-        return this;
     }
 
     public boolean isOpen() {

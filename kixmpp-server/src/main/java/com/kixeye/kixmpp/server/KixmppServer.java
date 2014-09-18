@@ -190,6 +190,8 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 
         this.cluster = new ClusterClient( this, clusterAddress.getHostName(), clusterAddress.getPort(), clusterDiscovery, 300000, bootstrap.group() );
         this.cluster.getMessageRegistry().addCustomMessage(1, RoomBroadcastTask.class);
+        this.cluster.getMessageRegistry().addCustomMessage(2, PrivateChatTask.class);
+        this.cluster.getMessageRegistry().addCustomMessage(3, CreateRoomTask.class);
         this.mapReduce = new MapReduceTracker(this, bootstrap.group());
         this.channels = new DefaultChannelGroup("All Channels", GlobalEventExecutor.INSTANCE);
 

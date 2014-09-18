@@ -369,7 +369,7 @@ public class MucRoom {
 
     public void receive(KixmppJid fromAddress, String nickname, String... messages) {
         mucModule.publishMessage(this, fromAddress, nickname, messages);
-
+        
         KixmppJid fromRoomJid = roomJid.withoutResource().withResource(nickname);
         
         for (User to : usersByNickname.values()) {

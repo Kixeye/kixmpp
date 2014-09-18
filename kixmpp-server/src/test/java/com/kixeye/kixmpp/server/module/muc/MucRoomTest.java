@@ -48,7 +48,7 @@ public class MucRoomTest {
     			.thenReturn(server).getMock();
     	
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings().isOpen(true));
+        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings(true, null));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -72,7 +72,7 @@ public class MucRoomTest {
     	
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
         
-        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings().isOpen(true));
+        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings(true, null));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -105,7 +105,7 @@ public class MucRoomTest {
     			.thenReturn(server).getMock();
     	
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings().isOpen(true));
+        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings(true, null));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -141,7 +141,7 @@ public class MucRoomTest {
     			.thenReturn(server).getMock();
     	
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings().isOpen(false));
+        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings(false, null));
 
         Channel channel = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute = Mockito.mock(Attribute.class);
@@ -160,7 +160,7 @@ public class MucRoomTest {
     			.thenReturn(server).getMock();
     	
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings().isOpen(false));
+        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings(false, null));
 
         
         Channel channel = Mockito.mock(Channel.class);
@@ -180,7 +180,7 @@ public class MucRoomTest {
     @Test
     public void removeUser_userNotInRoom(){
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings().isOpen(false));
+        MucRoom mucRoom = new MucRoom((MucService)Mockito.when(Mockito.mock(MucService.class).getServer()).thenReturn(Mockito.mock(KixmppServer.class)).getMock(), roomJid, new MucRoomSettings(false, null));
 
         Assert.assertFalse(mucRoom.removeUser(new KixmppJid("test.user","testdomain")));
     }
@@ -193,7 +193,7 @@ public class MucRoomTest {
     			.thenReturn(server).getMock();
     	
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings().isOpen(true));
+        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings(true, null));
 
         KixmppJid clientJid = new KixmppJid("test.user", "testdomain", "testresource");
 
@@ -222,7 +222,7 @@ public class MucRoomTest {
     			.thenReturn(server).getMock();
     	
         KixmppJid roomJid = new KixmppJid("testnode", "testdomain");
-        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings().isOpen(false));
+        MucRoom mucRoom = new MucRoom(mucService, roomJid, new MucRoomSettings(false, null));
 
         KixmppJid clientJid = new KixmppJid("test.user", "testdomain", "testresource");
 

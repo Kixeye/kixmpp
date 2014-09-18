@@ -28,6 +28,7 @@ import org.fusesource.hawtdispatch.Task;
 
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.server.KixmppServer;
+import com.kixeye.kixmpp.server.cluster.message.CreateRoomTask;
 
 /**
  * A {@link MucService} that persists rooms in memory.
@@ -102,6 +103,8 @@ public class InMemoryMucService implements MucService {
                 mucRoom = prevRoom;
             }
         }
+        
+        server.getCluster().sendMessageToAll(new CreateRoomTask(this.subDomain, name, options, owner, ownerNickname), false);
 
         return mucRoom;
 	}
