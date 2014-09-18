@@ -88,7 +88,9 @@ public class NodeServer {
 
     public void shutdown() {
         try {
-            acceptChannel.close().sync();
+            if (acceptChannel != null) {
+                acceptChannel.close().sync();
+            }
         } catch (Exception ex) {
             logger.error("Exception shutting down NodeServer", ex);
         }
