@@ -32,7 +32,7 @@ import org.joda.time.format.DateTimeFormatter;
 public final class XmppDateUtils {
 	private XmppDateUtils() { }
 
-    private static final DateTimeFormatter xmppDateTimeFormatter = DateTimeFormat.forPattern("yyyy-MM-dd'T'hh:mm:ssZ");
+    private static final DateTimeFormatter xmppDateTimeFormatter = DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ssZ");
     
     /**
      * Format a long from epoch in UTC to a string.
