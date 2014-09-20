@@ -44,4 +44,46 @@ public class RoomBroadcastTask extends RoomTask {
     public void run() {
         getRoom().receive(from, nickname, messages);
     }
+
+	/**
+	 * @return the from
+	 */
+	public KixmppJid getFrom() {
+		return from;
+	}
+
+	/**
+	 * @param from the from to set
+	 */
+	public void setFrom(KixmppJid from) {
+		this.from = from;
+	}
+
+	/**
+	 * @return the nickname
+	 */
+	public String getNickname() {
+		return nickname;
+	}
+
+	/**
+	 * @param nickname the nickname to set
+	 */
+	public void setNickname(String nickname) {
+		this.nickname = nickname;
+	}
+
+	/**
+	 * @return the messages
+	 */
+	public String[] getMessages() {
+		return messages;
+	}
+
+	/**
+	 * @param messages the messages to set
+	 */
+	public void setMessages(String[] messages) {
+		this.messages = messages;
+	}
 }

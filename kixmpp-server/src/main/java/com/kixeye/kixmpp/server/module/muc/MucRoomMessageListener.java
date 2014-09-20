@@ -31,10 +31,10 @@ public interface MucRoomMessageListener {
 	/**
 	 * Handle room messages.
 	 * 
-	 * @param room
+	 * @param roomJid
 	 * @param sender
 	 * @param senderNickname
 	 * @param messages
 	 */
-	public void handle(MucRoom room, KixmppJid sender, String senderNickname, String... messages);
+	public void handle(KixmppJid roomJid, KixmppJid sender, String senderNickname, String... messages);
 }

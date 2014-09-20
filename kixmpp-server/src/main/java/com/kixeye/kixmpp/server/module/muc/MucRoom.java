@@ -344,9 +344,9 @@ public class MucRoom {
         
         String fromNickname = nicknamesByBareJid.get(fromAddress.withoutResource());
         //TODO validate fromAddress is roomJid or is a member of the room
-        KixmppJid fromRoomJid = roomJid.withoutResource().withResource(fromNickname);
+        KixmppJid fromRoomJid = roomJid.withResource(fromNickname);
         
-        mucModule.publishMessage(this, fromRoomJid, fromNickname, messages);
+        mucModule.publishMessage(roomJid, fromRoomJid, fromNickname, messages);
 
         for (User to : usersByNickname.values()) {
             MucRole toRole = jidRoles.get(to.bareJid.withoutResource());
@@ -368,8 +368,6 @@ public class MucRoom {
     }
 
     public void receive(KixmppJid fromAddress, String nickname, String... messages) {
-        mucModule.publishMessage(this, fromAddress, nickname, messages);
-        
         KixmppJid fromRoomJid = roomJid.withoutResource().withResource(nickname);
         
         for (User to : usersByNickname.values()) {

@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
 import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.handler.KixmppStanzaHandler;
 import com.kixeye.kixmpp.server.KixmppServer;
+import com.kixeye.kixmpp.server.cluster.message.RoomBroadcastTask;
+import com.kixeye.kixmpp.server.cluster.message.RoomTask;
 import com.kixeye.kixmpp.server.module.KixmppServerModule;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 
@@ -104,14 +106,15 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	 * @param sender
 	 * @param messages
 	 */
-	protected void publishMessage(MucRoom room, KixmppJid sender, String senderNickname, String... messages) {
-		for (MucRoomMessageListener listener : messageListeners) {
-			try {
-				listener.handle(room, sender, senderNickname, messages);
-			} catch (Exception e) {
-				logger.error("Error while invoking listener: [{}].", listener, e);
-			}
-		}
+	protected void publishMessage(KixmppJid roomJid, KixmppJid sender, String senderNickname, String... messages) {
+		server.getEventEngine().publishTask(
+        		roomJid,
+        		new InvokeListenersTask(this, 
+        				roomJid, 
+        				sender, 
+        				senderNickname, 
+        				messages)
+        		);
 	}
 	
 	/**
@@ -169,6 +172,35 @@ public class MucKixmppServerModule implements KixmppServerModule {
 		this.historyProvider = historyProvider;
 	}
 
+	/**
+	 * Figures out what to do with a {@link RoomTask}.
+	 * 
+	 * @param roomTask
+	 */
+	public void handleClusterTask(RoomTask roomTask) {
+		if (roomTask instanceof RoomBroadcastTask) {
+			RoomBroadcastTask broadcastTask = (RoomBroadcastTask)roomTask;
+
+			KixmppJid roomJid = new KixmppJid(broadcastTask.getRoomId(), broadcastTask.getServiceSubDomain() + "." + server.getDomain());
+			
+			publishMessage(roomJid, broadcastTask.getFrom(), broadcastTask.getNickname(), broadcastTask.getMessages());
+		}
+		
+        MucService service = getService(roomTask.getServiceSubDomain());
+        if (service == null) {
+            return;
+        }
+        
+        MucRoom room = service.getRoom(roomTask.getRoomId());
+        if (room == null) {
+            return;
+        }
+        
+        roomTask.setRoom(room);
+        
+        server.getEventEngine().publishTask(room.getRoomJid(),roomTask);
+	}
+	
 	private KixmppStanzaHandler JOIN_ROOM_HANDLER = new KixmppStanzaHandler() {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
@@ -248,6 +280,41 @@ public class MucKixmppServerModule implements KixmppServerModule {
 
 		public void run() {
             room.receiveMessages(sender, true, body);
+		}
+	}
+	
+	private static class InvokeListenersTask extends Task {
+		private final MucKixmppServerModule module;
+		private final KixmppJid roomJid;
+		private final KixmppJid sender;
+		private final String senderNickname;
+		private final String[] messages;
+		
+		/**
+		 * @param module
+		 * @param roomJid
+		 * @param sender
+		 * @param senderNickname
+		 * @param messages
+		 */
+		public InvokeListenersTask(MucKixmppServerModule module,
+				KixmppJid roomJid, KixmppJid sender, String senderNickname,
+				String[] messages) {
+			this.module = module;
+			this.roomJid = roomJid;
+			this.sender = sender;
+			this.senderNickname = senderNickname;
+			this.messages = messages;
+		}
+
+		public void run() {
+			for (MucRoomMessageListener listener : module.messageListeners) {
+				try {
+					listener.handle(roomJid, sender, senderNickname, messages);
+				} catch (Exception e) {
+					logger.error("Error while invoking listener: [{}].", listener, e);
+				}
+			}
 		}
 	}
 }
