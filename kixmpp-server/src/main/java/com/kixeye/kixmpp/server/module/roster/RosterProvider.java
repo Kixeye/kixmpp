@@ -23,6 +23,7 @@ package com.kixeye.kixmpp.server.module.roster;
 import java.util.List;
 
 import com.kixeye.kixmpp.KixmppJid;
+import io.netty.util.concurrent.Promise;
 
 /**
  * Provides the roster for a user.
@@ -36,5 +37,5 @@ public interface RosterProvider {
 	 * @param userJid
 	 * @return
 	 */
-	public List<RosterItem> getRoster(KixmppJid userJid);
+	public Promise<List<RosterItem>> getRoster(KixmppJid userJid);
 }
