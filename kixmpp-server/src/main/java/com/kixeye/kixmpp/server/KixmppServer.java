@@ -37,6 +37,7 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import io.netty.util.concurrent.Promise;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
@@ -842,7 +843,11 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
             return "ws://" + location;
 	    }
 	}
-
+	
+	public <T> Promise<T> createPromise() {
+		return bootstrap.childGroup().next().newPromise();
+	}
+	
     public ClusterClient getCluster() {
         return cluster;
     }
