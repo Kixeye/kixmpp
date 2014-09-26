@@ -26,6 +26,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.ImmediateEventExecutor;
+import io.netty.util.concurrent.Promise;
+import io.netty.util.concurrent.Future;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 
@@ -42,10 +46,11 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
  */
 public class RosterKixmppServerModule implements KixmppServerModule {
 	public static final RosterProvider NOOP_ROSTER_PROVIDER = new RosterProvider() {
+
 		private final List<RosterItem> emptyList = Collections.unmodifiableList(new ArrayList<RosterItem>(0));
 		
-		public List<RosterItem> getRoster(KixmppJid userJid) {
-			return emptyList;
+		public Promise<List<RosterItem>> getRoster(KixmppJid userJid) {
+			return ImmediateEventExecutor.INSTANCE.<List<RosterItem>>newPromise().setSuccess(emptyList);
 		}
 	};
 	
@@ -94,49 +99,60 @@ public class RosterKixmppServerModule implements KixmppServerModule {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
 		 */
-		public void handle(Channel channel, Element stanza) {
+		public void handle(final Channel channel, final Element stanza) {
+
 			Element query = stanza.getChild("query", Namespace.getNamespace("jabber:iq:roster"));
 			
 			if (query != null) {
-				Element iq = new Element("iq");
-				iq.setAttribute("type", "result");
-				
-				String id = stanza.getAttributeValue("id");
-				if (id != null) {
-					iq.setAttribute("id", id);
-				}
-				
-				Element queryResult = new Element("query", Namespace.getNamespace("jabber:iq:roster"));
-				
-				List<RosterItem> roster = rosterProvider.getRoster(channel.attr(BindKixmppServerModule.JID).get());
-				
-				if (roster != null && !roster.isEmpty()) {
-					for (RosterItem rosterItem : roster) {
-						Element item = new Element("item", queryResult.getNamespace());
-						
-						if (rosterItem.getJid() != null) {
-							item.setAttribute("jid", rosterItem.getJid().getFullJid());
+
+				Promise<List<RosterItem>> promise = rosterProvider.getRoster(channel.attr(BindKixmppServerModule.JID).get());
+
+				promise.addListener(new GenericFutureListener<Future<List<RosterItem>>>() {
+
+					@Override
+					public void operationComplete(final Future<List<RosterItem>> future) throws Exception {
+
+						Element iq = new Element("iq");
+						iq.setAttribute("type", "result");
+
+						String id = stanza.getAttributeValue("id");
+						if (id != null) {
+							iq.setAttribute("id", id);
 						}
-						if (rosterItem .getName() != null) {
-							item.setAttribute("name", rosterItem.getName());
+
+						Element queryResult = new Element("query", Namespace.getNamespace("jabber:iq:roster"));
+
+						if (future.isSuccess()) {
+							final List<RosterItem> roster = future.getNow();
+							if (roster != null && !roster.isEmpty()) {
+								for (RosterItem rosterItem : roster) {
+									Element item = new Element("item", queryResult.getNamespace());
+
+									if (rosterItem.getJid() != null) {
+										item.setAttribute("jid", rosterItem.getJid().getFullJid());
+									}
+									if (rosterItem .getName() != null) {
+										item.setAttribute("name", rosterItem.getName());
+									}
+									if (rosterItem.getSubscription() != null) {
+										item.setAttribute("subscription", rosterItem.getSubscription().name());
+									}
+									if (rosterItem.getGroup() != null) {
+										Element group = new Element("group", item.getNamespace());
+										group.setText(rosterItem.getGroup());
+
+										item.addContent(group);
+									}
+
+									queryResult.addContent(item);
+								}
+							}
 						}
-						if (rosterItem.getSubscription() != null) {
-							item.setAttribute("subscription", rosterItem.getSubscription().name());
-						}
-						if (rosterItem.getGroup() != null) {
-							Element group = new Element("group", item.getNamespace());
-							group.setText(rosterItem.getGroup());
-							
-							item.addContent(group);
-						}
-						
-						queryResult.addContent(item);
+						iq.addContent(queryResult);
+
+						channel.writeAndFlush(iq);
 					}
-				}
-				
-				iq.addContent(queryResult);
-				
-				channel.writeAndFlush(iq);
+				});
 			}
 		}
 	};
