@@ -602,9 +602,9 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
     		
     		if (channels == null) {
     			channels = new HashSet<>();
-    			channels.add(channel);
     		}
-    		
+        	channels.add(channel);
+
         	usernameChannel.put(jid.getNode(), channels);
     	} finally {
     		lock.unlock();
