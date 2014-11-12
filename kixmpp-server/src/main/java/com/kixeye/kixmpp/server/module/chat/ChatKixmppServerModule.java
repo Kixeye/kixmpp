@@ -23,9 +23,7 @@ package com.kixeye.kixmpp.server.module.chat;
 import io.netty.channel.Channel;
 
 import java.util.List;
-import java.util.Set;
 
-import org.fusesource.hawtdispatch.Task;
 import org.jdom2.Element;
 
 import com.kixeye.kixmpp.KixmppJid;
@@ -42,7 +40,7 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
  */
 public class ChatKixmppServerModule implements KixmppServerModule {
 	private KixmppServer server;
-	
+
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#install(com.kixeye.kixmpp.server.KixmppServer)
 	 */
@@ -76,46 +74,9 @@ public class ChatKixmppServerModule implements KixmppServerModule {
 				KixmppJid toJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
 				String body = stanza.getChildText("body", stanza.getNamespace());
 
-                server.getEventEngine().publishTask(toJid, new ReceiveMessageTask(fromJid, toJid, body));
+				server.getCluster().sendMessageToAll(new PrivateChatTask(fromJid, toJid, body), true);
 			}
 		}
 	};
-	
-	private class ReceiveMessageTask extends Task {
-		private final KixmppJid fromJid;
-		private final KixmppJid toJid;
-		private final String body;
-		
-		/**
-		 * @param fromJid
-		 * @param toJid
-		 * @param body
-		 */
-		public ReceiveMessageTask(KixmppJid fromJid, KixmppJid toJid, String body) {
-			this.fromJid = fromJid;
-			this.toJid = toJid;
-			this.body = body;
-		}
 
-		public void run() {
-			Set<Channel> channels = server.getChannels(toJid.getNode());
-			
-			for (Channel channel : channels) {
-				Element messageElement = new Element("message");
-				messageElement.setAttribute("type", "chat");
-				messageElement.setAttribute("from", fromJid.getFullJid());
-				messageElement.setAttribute("to", toJid.getFullJid());
-				
-				Element bodyElement = new Element("body");
-				bodyElement.setText(body);
-				
-				messageElement.addContent(bodyElement);
-				
-				channel.writeAndFlush(messageElement);
-			}
-					
-            server.getCluster().sendMessageToAll(
-            		new PrivateChatTask(fromJid, toJid, body), false);
-		}
-	}
 }

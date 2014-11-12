@@ -20,6 +20,8 @@ package com.kixeye.kixmpp.server.cluster.message;
  * #L%
  */
 
+import com.kixeye.kixmpp.server.KixmppServer;
+import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import io.netty.channel.Channel;
 
 import java.util.Set;
@@ -30,7 +32,7 @@ import com.kixeye.kixmpp.KixmppJid;
 
 /**
  * Distributes a private message.
- * 
+ *
  * @author ebahtijaragic
  */
 public class PrivateChatTask extends ClusterTask {
@@ -93,23 +95,43 @@ public class PrivateChatTask extends ClusterTask {
 	 * @see org.fusesource.hawtdispatch.Task#run()
 	 */
 	public void run() {
-		KixmppJid toJid = KixmppJid.fromRawJid(this.fromJid);
 		KixmppJid fromJid = KixmppJid.fromRawJid(this.fromJid);
-		
-		Set<Channel> channels = getKixmppServer().getChannels(toJid.getNode());
-		
-		for (Channel channel : channels) {
+		KixmppJid toJid = KixmppJid.fromRawJid(this.toJid);
+		KixmppServer server = getKixmppServer();
+
+		// broadcast message stanza to all channels of the recipient
+		for (Channel toChannel : server.getChannels(toJid.getNode())) {
 			Element messageElement = new Element("message");
 			messageElement.setAttribute("type", "chat");
 			messageElement.setAttribute("from", fromJid.getFullJid());
 			messageElement.setAttribute("to", toJid.getFullJid());
-			
+
 			Element bodyElement = new Element("body");
 			bodyElement.setText(body);
-			
+
 			messageElement.addContent(bodyElement);
-			
-			channel.writeAndFlush(messageElement);
+
+			toChannel.writeAndFlush(messageElement);
+		}
+
+		// broadcast message stanza to all channels of the sender
+		// except for the channel it was sent from
+		for (Channel fromChannel : server.getChannels(fromJid.getNode())) {
+			// skip the channel message was sent from
+			if (fromChannel.attr(BindKixmppServerModule.JID).get().toString().equalsIgnoreCase(fromJid.toString())) {
+				continue;
+			}
+			Element messageElement = new Element("message");
+			messageElement.setAttribute("type", "chat");
+			messageElement.setAttribute("from", fromJid.getFullJid());
+			messageElement.setAttribute("to", toJid.getFullJid());
+
+			Element bodyElement = new Element("body");
+			bodyElement.setText(body);
+
+			messageElement.addContent(bodyElement);
+
+			fromChannel.writeAndFlush(messageElement);
 		}
 	}
 }
