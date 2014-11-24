@@ -39,8 +39,6 @@ import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.date.XmppDateUtils;
 import com.kixeye.kixmpp.server.cluster.message.RoomBroadcastTask;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A simple muc room.
