@@ -78,7 +78,7 @@ public class InMemoryMucService implements MucService {
      * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String, com.kixeye.kixmpp.server.module.muc.MucRoomSettings)
      */
     public MucRoom addRoom(String name, MucRoomSettings options) {
-        return addRoom(name, new MucRoomSettings(), null, null);
+        return addRoom(name, options, null, null);
     }
     
 	/**

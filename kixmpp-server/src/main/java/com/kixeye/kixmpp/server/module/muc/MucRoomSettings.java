@@ -26,15 +26,18 @@ package com.kixeye.kixmpp.server.module.muc;
  * @author dturner@kixeye.com
  */
 public class MucRoomSettings {
+	private boolean presenceEnabled = false;
     private boolean isOpen = true;
     private String subject = null;
     
-    public MucRoomSettings(boolean isOpen, String subject) {
+    public MucRoomSettings(boolean presenceEnabled, boolean isOpen, String subject) {
+	    this.presenceEnabled = presenceEnabled;
 		this.isOpen = isOpen;
 		this.subject = subject;
 	}
 
     public MucRoomSettings(MucRoomSettings settings) {
+	    this.presenceEnabled = settings.presenceEnabled;
     	this.isOpen = settings.isOpen;
     	this.subject = settings.subject;
     }
@@ -57,4 +60,6 @@ public class MucRoomSettings {
     public String getSubject() {
         return subject;
     }
+
+	public boolean isPresenceEnabled() { return presenceEnabled; }
 }

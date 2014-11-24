@@ -65,7 +65,7 @@ public class KixmppEventEngine {
 	 * Publishes a stanza.
 	 * 
 	 * @param channel
-	 * @param element
+	 * @param stanza
 	 */
 	public void publishStanza(Channel channel, Element stanza) {
 		String to = stanza.getAttributeValue("to");
@@ -380,7 +380,6 @@ public class KixmppEventEngine {
 	/**
 	 * Unregisters a stanza handler.
 	 * 
-	 * @param qualifiedName
 	 * @param handler
 	 */
 	public void unregisterGlobalStanzaHandler(KixmppStanzaHandler handler) {

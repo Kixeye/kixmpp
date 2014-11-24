@@ -39,6 +39,8 @@ import com.kixeye.kixmpp.KixmppJid;
 import com.kixeye.kixmpp.date.XmppDateUtils;
 import com.kixeye.kixmpp.server.cluster.message.RoomBroadcastTask;
 import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A simple muc room.
@@ -101,7 +103,6 @@ public class MucRoom {
      * A user requets to join the room.
      * @param channel
      * @param nickname
-     * @param mucStanza
      */
     public void join(Channel channel, String nickname) {
     	join(channel, nickname, null);
@@ -112,12 +113,13 @@ public class MucRoom {
      *
      * @param channel
      * @param nickname
+     * @param mucStanza
      */
     public void join(Channel channel, String nickname, Element mucStanza) {
         KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
 
         if (settings.isOpen() && !jidRoles.containsKey(jid.withoutResource())) {
-        	addUser(jid, nickname, MucRole.Participant, MucAffiliation.Member);
+            addUser(jid, nickname, MucRole.Participant, MucAffiliation.Member);
         }
         
         verifyMembership(jid.withoutResource());
@@ -125,28 +127,27 @@ public class MucRoom {
 
         User user = usersByNickname.get(nickname);
 
+        boolean existingUser = true;
         if (user == null) {
             user = new User(nickname, jid.withoutResource());
+            usersByNickname.put(nickname, user);
+            existingUser = false;
         }
 
         Client client = user.addClient(new Client(jid, nickname, channel));
 
-        usersByNickname.put(nickname, user);
+        // xep-0045 7.2.3 begin
+        // self presence
+        channel.writeAndFlush(createPresence(roomJid.withResource(nickname), jid, MucRole.Participant, null));
 
-        Element presence = new Element("presence");
-        presence.setAttribute("id", UUID.randomUUID().toString());
-        presence.setAttribute("from", roomJid.withResource(nickname).toString());
-        presence.setAttribute("to", jid.toString());
+        if (settings.isPresenceEnabled() && !existingUser) {
+            // Send presence from existing occupants to new occupant
+            sendExistingOccupantsPresenceToNewOccupant(user, channel);
 
-        Element x = new Element("x", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
-
-        x.addContent(new Element("item", Namespace.getNamespace("http://jabber.org/protocol/muc#user"))
-                .setAttribute("affiliation", "member")
-                .setAttribute("role", "participant"));
-
-        presence.addContent(x);
-
-        channel.writeAndFlush(presence);
+            // Send new occupant's presence to all occupants
+            broadcastPresence(user, MucRole.Participant, null);
+        }
+        // xep-0045 7.2.3 end
 
         if (settings.getSubject() != null) {
             Element message = new Element("message");
@@ -159,68 +160,96 @@ public class MucRoom {
 
             channel.writeAndFlush(message);
         }
-        
-        
-        if (mucStanza != null) {
-        	Element history = mucStanza.getChild("history", mucStanza.getNamespace());
-        	
-        	if (history != null) {
-		        MucHistoryProvider historyProvider = mucModule.getHistoryProvider();
-		        
-		        if (historyProvider != null) {
-		        	Integer maxChars = null;
-		        	Integer maxStanzas = null;
-		        	Integer seconds = null;
-		        	
-		        	String parsableString = history.getAttributeValue("maxchars");
-		        	if (parsableString != null) {
-		        		try {
-		        			maxChars = Integer.parseInt(parsableString);
-		        		} catch (Exception e) {}
-		        	}
-		        	parsableString = history.getAttributeValue("maxstanzas");
-		        	if (parsableString != null) {
-		        		try {
-		        			maxStanzas = Integer.parseInt(parsableString);
-		        		} catch (Exception e) {}
-		        	}
-		        	parsableString = history.getAttributeValue("seconds");
-		        	if (parsableString != null) {
-		        		try {
-		        			seconds = Integer.parseInt(parsableString);
-		        		} catch (Exception e) {}
-		        	}
-		        	
-		        	String since = history.getAttributeValue("since");
-		        	
-		        	List<MucHistory> historyItems = historyProvider.getHistory(roomJid, maxChars, maxStanzas, seconds, since);
-		        	
-		        	if (historyItems != null) {
-		        		for (MucHistory historyItem : historyItems) {
-		        			Element message = new Element("message")
-		        				.setAttribute("id", UUID.randomUUID().toString())
-		        				.setAttribute("from", roomJid.withResource(historyItem.getNickname()).toString())
-		        				.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString())
-		        				.setAttribute("type", "groupchat");
-		        			message.addContent(new Element("body").setText(historyItem.getBody()));
-		        			
-		        			Element addresses = new Element("addresses", Namespace.getNamespace("http://jabber.org/protocol/address"));
-		        			addresses.addContent(new Element("address", addresses.getNamespace()).setAttribute("type", "ofrom").setAttribute("jid", historyItem.getFrom().toString()));
-		        			message.addContent(addresses);
-		        			
-		        			message.addContent(new Element("delay", Namespace.getNamespace("urn:xmpp:delay"))
-		        					.setAttribute("from", roomJid.toString())
-		        					.setAttribute("stamp", XmppDateUtils.format(historyItem.getTimestamp())));
-		        			
-		        			channel.writeAndFlush(message);
-		        		}
-		        	}
-		        }
+
+		if (mucStanza != null) {
+			Element history = mucStanza.getChild("history", mucStanza.getNamespace());
+
+			if (history != null) {
+				MucHistoryProvider historyProvider = mucModule.getHistoryProvider();
+
+				if (historyProvider != null) {
+					Integer maxChars = null;
+					Integer maxStanzas = null;
+					Integer seconds = null;
+
+					String parsableString = history.getAttributeValue("maxchars");
+					if (parsableString != null) {
+						try {
+							maxChars = Integer.parseInt(parsableString);
+						} catch (Exception e) {}
+					}
+					parsableString = history.getAttributeValue("maxstanzas");
+					if (parsableString != null) {
+						try {
+							maxStanzas = Integer.parseInt(parsableString);
+						} catch (Exception e) {}
+					}
+					parsableString = history.getAttributeValue("seconds");
+					if (parsableString != null) {
+						try {
+							seconds = Integer.parseInt(parsableString);
+						} catch (Exception e) {}
+					}
+
+					String since = history.getAttributeValue("since");
+
+					List<MucHistory> historyItems = historyProvider.getHistory(roomJid, maxChars, maxStanzas, seconds, since);
+
+					if (historyItems != null) {
+						for (MucHistory historyItem : historyItems) {
+							Element message = new Element("message")
+								.setAttribute("id", UUID.randomUUID().toString())
+								.setAttribute("from", roomJid.withResource(historyItem.getNickname()).toString())
+								.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString())
+								.setAttribute("type", "groupchat");
+							message.addContent(new Element("body").setText(historyItem.getBody()));
+
+							Element addresses = new Element("addresses", Namespace.getNamespace("http://jabber.org/protocol/address"));
+							addresses.addContent(new Element("address", addresses.getNamespace()).setAttribute("type", "ofrom").setAttribute("jid", historyItem.getFrom().toString()));
+							message.addContent(addresses);
+
+							message.addContent(new Element("delay", Namespace.getNamespace("urn:xmpp:delay"))
+									.setAttribute("from", roomJid.toString())
+									.setAttribute("stamp", XmppDateUtils.format(historyItem.getTimestamp())));
+
+							channel.write(message);
+						}
+						channel.flush();
+					}
+				}
         	}
         }
 
         channel.closeFuture().addListener(new CloseChannelListener(client));
     }
+
+	private void sendExistingOccupantsPresenceToNewOccupant(User newUser, Channel channel) {
+		KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
+
+		for (User user : usersByNickname.values()) {
+
+
+			if (newUser.getBareJid().equals(user.getBareJid())) {
+				continue;
+			}
+
+			MucRole role = jidRoles.get(jid.withoutResource());
+			Element presence = createPresence(roomJid.withResource(user.getNickname()), jid, role, null);
+			channel.write(presence);
+		}
+		if (!usersByNickname.isEmpty()) {
+			channel.flush();
+		}
+	}
+
+	private void broadcastPresence(User fromUser, MucRole role, String type) {
+		for (User user : usersByNickname.values()) {
+			if (user.getBareJid().equals(fromUser.getBareJid())) {
+				continue;
+			}
+			user.receivePresence(fromUser, role, type);
+		}
+	}
 
     private void checkForNicknameInUse(String nickname, KixmppJid jid) {
         User user = usersByNickname.get(nickname);
@@ -270,7 +299,8 @@ public class MucRoom {
      * @return
      */
     public boolean removeUser(KixmppJid address) {
-        String nickname = nicknamesByBareJid.get(address.withoutResource());
+	    KixmppJid bareJid = address.withoutResource();
+        String nickname = nicknamesByBareJid.get(bareJid);
         if (nickname == null) {
             //user is not in the room
             return false;
@@ -284,6 +314,23 @@ public class MucRoom {
         removeDisconnectedUser(user);
         return true;
     }
+
+	public boolean userLeft(Channel channel, String nickname) {
+		User user = usersByNickname.get(nickname);
+		if (user == null) {
+			//user not found
+			return false;
+		}
+		Client client = user.getClient(channel);
+		if (client == null) {
+			//client not found
+			return false;
+		}
+		user.removeClient(client);
+		removeDisconnectedUser(user);
+
+		return true;
+	}
 
     /**
      * A user leaves the room.
@@ -314,6 +361,39 @@ public class MucRoom {
 
         return message;
     }
+
+	private Element createPresence(KixmppJid from, KixmppJid to, MucRole role, String type) {
+		Element presence = new Element("presence");
+
+		presence.setAttribute("id", UUID.randomUUID().toString());
+		presence.setAttribute("from", from.toString());
+		presence.setAttribute("to", to.toString());
+
+		Element x = new Element("x", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
+
+		if (type != null) {
+			presence.setAttribute("type", type);
+		}
+
+		Element item = new Element("item", Namespace.getNamespace("http://jabber.org/protocol/muc#user"));
+		item.setAttribute("affiliation", "member");
+
+		switch (role) {
+			case Participant:
+				item.setAttribute("role", "participant");
+				break;
+			case Moderator:
+				item.setAttribute("role", "moderator");
+				break;
+			case Visitor:
+				item.setAttribute("role", "visitor");
+				break;
+		}
+		x.addContent(item);
+		presence.addContent(x);
+
+		return presence;
+	}
 
     /**
      * Broadcasts a message using supplied nickname.
@@ -449,7 +529,14 @@ public class MucRoom {
 
     private void removeDisconnectedUser(User user) {
         if (user.getClientCount() == 0) {
-            this.usersByNickname.remove(user.getNickname());
+	        MucRole role = jidRoles.get(user.getBareJid());
+
+	        if (settings.isPresenceEnabled()) {
+		        broadcastPresence(user, role, "unavailable");
+	        }
+	        this.usersByNickname.remove(user.getNickname());
+	        this.jidAffiliations.remove(user.getBareJid());
+	        this.jidRoles.remove(user.getBareJid());
         }
     }
 
@@ -501,6 +588,13 @@ public class MucRoom {
                 }
             }
         }
+
+	    public void receivePresence(User fromUser, MucRole role, String type) {
+		    for (Client client : clientsByAddress.values()) {
+			    Element presence = createPresence(roomJid.withResource(fromUser.getNickname()), client.getAddress(), role, type);
+			    client.getChannel().writeAndFlush(presence);
+		    }
+	    }
 
         public Collection<Client> getConnections() {
             return clientsByAddress.values();
