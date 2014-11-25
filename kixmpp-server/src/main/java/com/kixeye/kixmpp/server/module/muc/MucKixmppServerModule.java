@@ -74,6 +74,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 		this.server = server;
 		
 		this.server.getEventEngine().registerGlobalStanzaHandler("presence", JOIN_ROOM_HANDLER);
+		this.server.getEventEngine().registerGlobalStanzaHandler("presence", LEAVE_ROOM_HANDLER);
 		this.server.getEventEngine().registerGlobalStanzaHandler("message", ROOM_MESSAGE_HANDLER);
 	}
 
@@ -82,6 +83,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	 */
 	public void uninstall(KixmppServer server) {
 		this.server.getEventEngine().unregisterGlobalStanzaHandler("presence", JOIN_ROOM_HANDLER);
+		this.server.getEventEngine().unregisterGlobalStanzaHandler("presence", LEAVE_ROOM_HANDLER);
 		this.server.getEventEngine().unregisterGlobalStanzaHandler("message", ROOM_MESSAGE_HANDLER);
 	}
 	
@@ -224,7 +226,28 @@ public class MucKixmppServerModule implements KixmppServerModule {
 			}
 		}
 	};
-	
+
+	private KixmppStanzaHandler LEAVE_ROOM_HANDLER = new KixmppStanzaHandler() {
+		/**
+		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
+		 */
+		public void handle(Channel channel, Element stanza) {
+			if (stanza.getAttribute("type") != null && stanza.getAttribute("to") != null) {
+				if (stanza.getAttributeValue("type").equals("unavailable")) {
+					KixmppJid fullRoomJid = KixmppJid.fromRawJid(stanza.getAttributeValue("to"));
+					MucService service = services.get(fullRoomJid.getDomain().toLowerCase().replace("." + server.getDomain(), ""));
+					if (service != null) {
+						MucRoom room = service.getRoom(fullRoomJid.getNode());
+						if (room != null) {
+							server.getEventEngine().publishTask(room.getRoomJid(),
+									new LeaveRoomTask(channel, room, fullRoomJid.getResource()));
+						}
+					}
+				}
+			}
+		}
+	};
+
 	private KixmppStanzaHandler ROOM_MESSAGE_HANDLER = new KixmppStanzaHandler() {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
@@ -266,7 +289,23 @@ public class MucKixmppServerModule implements KixmppServerModule {
 			room.join(channel, nickname, x);
 		}
 	}
-	
+
+	private static class LeaveRoomTask extends Task {
+		private final Channel channel;
+		private final MucRoom room;
+		private final String nickname;
+
+		public LeaveRoomTask(Channel channel, MucRoom room, String nickname) {
+			this.channel = channel;
+			this.room = room;
+			this.nickname = nickname;
+		}
+
+		public void run() {
+			room.userLeft(channel, nickname);
+		}
+	}
+
 	private static class ReceiveMessageTask extends Task {
 		private final KixmppJid sender;
 		private final MucRoom room;
