@@ -795,7 +795,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	        }
 
 	        // Handshake
-	        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(getWebSocketLocation(req), null, false);
+	        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(getWebSocketLocation(req), "xmpp", false);
 	        handshaker = wsFactory.newHandshaker(req);
 	        
 	        if (handshaker == null) {

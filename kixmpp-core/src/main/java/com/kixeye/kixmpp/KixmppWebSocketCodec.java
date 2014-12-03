@@ -20,7 +20,6 @@ package com.kixeye.kixmpp;
  * #L%
  */
 
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
@@ -45,45 +44,45 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An XMPP codec for the client. It implements the following spec: https://datatracker.ietf.org/doc/draft-ietf-xmpp-websocket/?include_text=1.
+ * An XMPP codec for the client.
+ * It implements the following spec: http://tools.ietf.org/html/draft-ietf-xmpp-websocket-00
  * 
- * @author ebahtijaragic
  */
 public class KixmppWebSocketCodec extends MessageToMessageCodec<Object, Object> {
 	private static final Logger logger  = LoggerFactory.getLogger(KixmppWebSocketCodec.class);
-	
+
 	private XMLReaderSAX2Factory readerFactory = new XMLReaderSAX2Factory(false);
-	
+
 	@Override
 	public boolean acceptInboundMessage(Object msg) throws Exception {
 		return msg instanceof WebSocketFrame;
 	}
-	
+
 	@Override
 	public boolean acceptOutboundMessage(Object msg) throws Exception {
 		return msg instanceof Element || msg instanceof KixmppStreamStart || 
 				msg instanceof KixmppStreamEnd || msg instanceof String || 
 				msg instanceof ByteBuf;
 	}
-	
+
 	@Override
 	protected void encode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
 		WebSocketFrame frame = null;
-		
+
 		if (msg instanceof Element) {
 			Element element = (Element)msg;
-			
+
 			if (element.getNamespace() == null || element.getNamespace() == Namespace.NO_NAMESPACE) {
 				if ("stream".equals(element.getNamespacePrefix())) {
 					element.setNamespace(Namespace.getNamespace("http://etherx.jabber.org/streams"));
 				} else {
 					element.setNamespace(Namespace.getNamespace("jabber:client"));
-					
+
 					IteratorIterable<Content> descendants = element.getDescendants();
-					
+
 					while (descendants.hasNext()) {
 						Content content = descendants.next();
-						
+
 						if (content instanceof Element) {
 							Element descendantElement = (Element)content;
 							if (descendantElement.getNamespace() == null || descendantElement.getNamespace() == Namespace.NO_NAMESPACE) {
@@ -93,42 +92,45 @@ public class KixmppWebSocketCodec extends MessageToMessageCodec<Object, Object> 
 					}
 				}
 			}
-			
+
 			ByteBuf binaryData = ctx.alloc().buffer();
 			new XMLOutputter().output((Element)msg, new ByteBufOutputStream(binaryData));
-			
+
 			frame = new TextWebSocketFrame(binaryData);
 		} else if (msg instanceof KixmppStreamStart) {
 			KixmppStreamStart streamStart = (KixmppStreamStart)msg;
-			
+
 			StringWriter writer = new StringWriter();
-			
-			writer.append("<open xmlns=\"urn:ietf:params:xml:ns:xmpp-framing\"");
-			
+
+			if (streamStart.doesIncludeXmlHeader()) {
+				writer.append("<?xml version='1.0' encoding='UTF-8'?>");
+			}
+			writer.append("<stream:stream ");
+			if (streamStart.getId() != null) {
+				writer.append(String.format("id=\"%s\" ", streamStart.getId()));
+			}
 			if (streamStart.getFrom() != null) {
-				writer.append(" from=\"" + streamStart.getFrom().getFullJid() + "\"");
+				writer.append(String.format("from=\"%s\" ", streamStart.getFrom().getFullJid()));
 			}
-			
 			if (streamStart.getTo() != null) {
-				writer.append(" to=\"" + streamStart.getTo().getFullJid() + "\"");
+				writer.append(String.format("to=\"%s\" ", streamStart.getTo()));
 			}
-			
-			writer.append(" version=\"1.0\" />");
-			
+			writer.append("version=\"1.0\" xmlns=\"jabber:client\" xmlns:stream=\"http://etherx.jabber.org/streams\">");
+
 			frame = new TextWebSocketFrame(writer.toString());
 		} else if (msg instanceof KixmppStreamEnd) {
-			frame = new TextWebSocketFrame("<close xmlns=\"urn:ietf:params:xml:ns:xmpp-framing\" />");
+			frame = new TextWebSocketFrame("</stream:stream>");
 		} else if (msg instanceof String) {
 			frame = new TextWebSocketFrame((String)msg);
 		} else if (msg instanceof ByteBuf) {
 			frame = new TextWebSocketFrame((ByteBuf)msg);
 		}
-		
+
 		if (frame != null) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("Sending: [{}]", frame.content().toString(StandardCharsets.UTF_8));
 			}
-			
+
 			out.add(frame);
 		}
 	}
@@ -136,22 +138,31 @@ public class KixmppWebSocketCodec extends MessageToMessageCodec<Object, Object> 
 	@Override
 	protected void decode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
 		WebSocketFrame frame = (WebSocketFrame)msg;
-		
+
+		ByteBuf content = frame.retain().content();
+		String frameString = content.toString(StandardCharsets.UTF_8);
+
 		if (logger.isDebugEnabled()) {
-			logger.debug("Received: [{}]", frame.content().toString(StandardCharsets.UTF_8));
+			logger.debug("Received: [{}]", frameString);
 		}
-		
-		SAXBuilder saxBuilder = new SAXBuilder(readerFactory);
-		Document document = saxBuilder.build(new ByteBufInputStream(frame.retain().content()));
-		
-		Element element = document.getRootElement();
-		
-		if ("open".equals(element.getName())) {
-			out.add(new KixmppStreamStart(element, false));
-		} else if ("close".equals(element.getName())) {
+
+		if (frameString.startsWith("<?xml")) {
+			frameString = frameString.replaceFirst("<\\?xml.*?\\?>", "");
+		}
+
+		if (frameString.startsWith("<stream:stream")) {
+			out.add(new KixmppStreamStart(null, true));
+		} else if (frameString.startsWith("</stream:stream")) {
 			out.add(new KixmppStreamEnd());
 		} else {
+
+			SAXBuilder saxBuilder = new SAXBuilder(readerFactory);
+			Document document = saxBuilder.build(new ByteBufInputStream(content));
+
+			Element element = document.getRootElement();
+
 			out.add(element);
 		}
+
 	}
 }
