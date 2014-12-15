@@ -536,6 +536,9 @@ public class MucRoom {
 	        this.jidAffiliations.remove(user.getBareJid());
 	        this.jidRoles.remove(user.getBareJid());
         }
+        if (usersByNickname.isEmpty()) {
+            this.service.removeRoom(roomId);
+        }
     }
 
     /**

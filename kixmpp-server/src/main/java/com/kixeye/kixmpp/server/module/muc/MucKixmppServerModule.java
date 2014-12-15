@@ -104,7 +104,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	/**
 	 * Publish a message for the listeners to pick up.
 	 * 
-	 * @param room
+	 * @param roomJid
 	 * @param sender
 	 * @param messages
 	 */
@@ -123,7 +123,6 @@ public class MucKixmppServerModule implements KixmppServerModule {
 	 * Adds a {@link InMemoryMucService}
 	 * 
 	 * @param name
-	 * @param service
 	 * @return
 	 */
 	public MucService addService(String name) {

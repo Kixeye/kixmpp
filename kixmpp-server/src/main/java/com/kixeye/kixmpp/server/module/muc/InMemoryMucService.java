@@ -37,7 +37,7 @@ import com.kixeye.kixmpp.server.KixmppServer;
 public class InMemoryMucService implements MucService {
 	private ConcurrentHashMap<String, MucRoom> rooms = new ConcurrentHashMap<>();
 
-    private final KixmppServer server;
+	private final KixmppServer server;
 	private final String subDomain;
 
 	/**
@@ -49,61 +49,61 @@ public class InMemoryMucService implements MucService {
 		this.subDomain = subDomain.toLowerCase();
 	}
 
-    @Override
-    public List<MucRoom> getRooms() {
-        return new ArrayList<>(rooms.values());
-    }
+	@Override
+	public List<MucRoom> getRooms() {
+		return new ArrayList<>(rooms.values());
+	}
 
-    @Override
-    public void broadcast(final KixmppJid jid, final String... messages) {
-        for(MucRoom room:rooms.values()){
-            final MucRoom tmp = room;
-            server.getEventEngine().publishTask( room.getRoomJid(), new Task() {
-                @Override
-                public void run() {
-                    tmp.receiveMessages(jid, false, messages);
-                }
-            });
-        }
-    }
+	@Override
+	public void broadcast(final KixmppJid jid, final String... messages) {
+		for(MucRoom room:rooms.values()){
+			final MucRoom tmp = room;
+			server.getEventEngine().publishTask( room.getRoomJid(), new Task() {
+				@Override
+				public void run() {
+					tmp.receiveMessages(jid, false, messages);
+				}
+			});
+		}
+	}
 
-    /**
-     * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String)
-     */
-    public MucRoom addRoom(String name) {
-        return addRoom(name, new MucRoomSettings());
-    }
+	/**
+	 * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String)
+	 */
+	public MucRoom addRoom(String name) {
+		return addRoom(name, new MucRoomSettings());
+	}
 
-    /**
-     * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String, com.kixeye.kixmpp.server.module.muc.MucRoomSettings)
-     */
-    public MucRoom addRoom(String name, MucRoomSettings options) {
-        return addRoom(name, options, null, null);
-    }
-    
+	/**
+	 * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String, com.kixeye.kixmpp.server.module.muc.MucRoomSettings)
+	 */
+	public MucRoom addRoom(String name, MucRoomSettings options) {
+		return addRoom(name, options, null, null);
+	}
+
 	/**
 	 * @see com.kixeye.kixmpp.server.module.muc.MucService#addRoom(java.lang.String, com.kixeye.kixmpp.server.module.muc.MucRoomSettings, com.kixeye.kixmpp.KixmppJid, java.lang.String)
 	 */
 	public MucRoom addRoom(String name, MucRoomSettings options, KixmppJid owner, String ownerNickname) {
-        name = name.toLowerCase();
+		name = name.toLowerCase();
 
-        MucRoom mucRoom = rooms.get(name);
+		MucRoom mucRoom = rooms.get(name);
 
-        if (mucRoom == null) {
-            mucRoom = new MucRoom(this, new KixmppJid(name, subDomain + "." + server.getDomain()), options);
-            
-            if (owner != null) {
-            	mucRoom.addUser(owner, ownerNickname, MucRole.Moderator, MucAffiliation.Owner);
-            }
+		if (mucRoom == null) {
+			mucRoom = new MucRoom(this, new KixmppJid(name, subDomain + "." + server.getDomain()), options);
 
-            MucRoom prevRoom = rooms.putIfAbsent(name, mucRoom);
+			if (owner != null) {
+				mucRoom.addUser(owner, ownerNickname, MucRole.Moderator, MucAffiliation.Owner);
+			}
 
-            if (prevRoom != null) {
-                mucRoom = prevRoom;
-            }
-        }
-        
-        return mucRoom;
+			MucRoom prevRoom = rooms.putIfAbsent(name, mucRoom);
+
+			if (prevRoom != null) {
+				mucRoom = prevRoom;
+			}
+		}
+
+		return mucRoom;
 	}
 
 	/**
@@ -113,6 +113,13 @@ public class InMemoryMucService implements MucService {
 		name = name.toLowerCase();
 		
 		return rooms.get(name);
+	}
+
+	/**
+	 * @see com.kixeye.kixmpp.server.module.muc.MucService#removeRoom(java.lang.String)
+	 */
+	public void removeRoom(String name) {
+		rooms.remove(name);
 	}
 
 	/**

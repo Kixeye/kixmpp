@@ -71,7 +71,13 @@ public interface MucService {
      * @return
      */
     public MucRoom addRoom(String name, MucRoomSettings options, KixmppJid owner, String ownerNickname);
-    
+
+
+    /**
+     * Removes a {@link MucRoom}.
+     * @param name
+     */
+    public void removeRoom(String name);
 	/**
 	 * Gets a {@link MucRoom}.
 	 * 
