@@ -20,6 +20,9 @@ package com.kixeye.kixmpp.server.module.auth;
  * #L%
  */
 
+import com.kixeye.kixmpp.server.KixmppServer;
+import io.netty.util.concurrent.Promise;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,7 +32,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author ebahtijaragic
  */
 public class InMemoryAuthenticationService implements AuthenticationService {
+
+	private KixmppServer server;
 	private Map<String, String> users = new ConcurrentHashMap<>();
+
+	public InMemoryAuthenticationService(KixmppServer server) {
+		this.server = server;
+	}
 	
 	/**
 	 * Adds a user.
@@ -48,7 +57,9 @@ public class InMemoryAuthenticationService implements AuthenticationService {
 	/**
 	 * @see com.kixeye.kixmpp.server.module.auth.AuthenticationService#authenticate(java.lang.String, java.lang.String)
 	 */
-	public boolean authenticate(String username, String password) {
-		return password.equals(users.get(username.toLowerCase()));
+	public Promise<Boolean> authenticate(String username, String password) {
+		Promise<Boolean> promise = server.createPromise();
+		promise.setSuccess(password.equals(users.get(username.toLowerCase())));
+		return promise;
 	}
 }

@@ -20,6 +20,8 @@ package com.kixeye.kixmpp.server.module.auth;
  * #L%
  */
 
+import io.netty.util.concurrent.Promise;
+
 /**
  * Authenticates users.
  * 
@@ -33,5 +35,5 @@ public interface AuthenticationService {
 	 * @param password
 	 * @return
 	 */
-	public boolean authenticate(String username, String password);
+	public Promise<Boolean> authenticate(String username, String password);
 }
