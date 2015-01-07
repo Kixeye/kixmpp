@@ -30,6 +30,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import org.jdom2.Element;
 
 import com.kixeye.kixmpp.KixmppJid;
@@ -46,7 +48,7 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 public class SaslKixmppServerModule implements KixmppServerModule {
 	public static AttributeKey<Boolean> IS_AUTHENTICATED = AttributeKey.valueOf("IS_AUTHENTICATED");
 	
-	private AuthenticationService authenticationService = new InMemoryAuthenticationService();
+	private AuthenticationService authenticationService;
 	
 	private KixmppServer server;
 	
@@ -55,6 +57,7 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 	 */
 	public void install(KixmppServer server) {
 		this.server = server;
+		this.authenticationService = new InMemoryAuthenticationService(server);
 		
 		this.server.getEventEngine().registerGlobalStanzaHandler("auth", AUTH_HANDLER);
 	}
@@ -106,7 +109,7 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 		/**
 		 * @see com.kixeye.kixmpp.server.KixmppStanzaHandler#handle(io.netty.channel.Channel, org.jdom2.Element)
 		 */
-		public void handle(Channel channel, Element stanza) {
+		public void handle(final Channel channel, Element stanza) {
 			if ("PLAIN".equals(stanza.getAttributeValue("mechanism"))) {
 				String base64Encoded = stanza.getText();
 				
@@ -118,20 +121,30 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 				
 				String[] credentialsSplit = raw.split("\0");
 				if (credentialsSplit.length > 1) {
-					String username = credentialsSplit[1];
-					
-					if (authenticationService.authenticate(username, credentialsSplit[2])) {
-						channel.attr(IS_AUTHENTICATED).set(true);
-						channel.attr(BindKixmppServerModule.JID).set(new KixmppJid(username, server.getDomain(), UUID.randomUUID().toString().replace("-", "")));
-						
-						Element success = new Element("success", null, "urn:ietf:params:xml:ns:xmpp-sasl");
-						
-						channel.writeAndFlush(success);
-					} else {
-						Element failure = new Element("failure", null, "urn:ietf:params:xml:ns:xmpp-sasl");
-						
-						channel.writeAndFlush(failure);
-					}
+					final String username = credentialsSplit[1];
+
+					authenticationService.authenticate(username, credentialsSplit[2]).addListener(
+						new GenericFutureListener<Future<Boolean>>() {
+							@Override
+							public void operationComplete(final Future<Boolean> future) throws Exception {
+								if (future.isSuccess()) {
+									Boolean authResult = future.getNow();
+									if (authResult) {
+										channel.attr(IS_AUTHENTICATED).set(true);
+										channel.attr(BindKixmppServerModule.JID).set(new KixmppJid(username, server.getDomain(), UUID.randomUUID().toString().replace("-", "")));
+
+										Element success = new Element("success", null, "urn:ietf:params:xml:ns:xmpp-sasl");
+
+										channel.writeAndFlush(success);
+									} else {
+										Element failure = new Element("failure", null, "urn:ietf:params:xml:ns:xmpp-sasl");
+
+										channel.writeAndFlush(failure);
+									}
+								}
+							}
+						}
+					);
 				} else {
 					Element failure = new Element("failure", null, "urn:ietf:params:xml:ns:xmpp-sasl");
 					
