@@ -20,7 +20,6 @@ package com.kixeye.kixmpp.server.module.auth;
  * #L%
  */
 
-import com.kixeye.kixmpp.server.KixmppServer;
 import io.netty.util.concurrent.Promise;
 
 /**
