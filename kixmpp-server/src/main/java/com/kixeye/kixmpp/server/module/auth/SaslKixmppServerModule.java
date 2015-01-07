@@ -132,15 +132,15 @@ public class SaslKixmppServerModule implements KixmppServerModule {
 									if (authResult) {
 										channel.attr(IS_AUTHENTICATED).set(true);
 										channel.attr(BindKixmppServerModule.JID).set(new KixmppJid(username, server.getDomain(), UUID.randomUUID().toString().replace("-", "")));
-
 										Element success = new Element("success", null, "urn:ietf:params:xml:ns:xmpp-sasl");
-
 										channel.writeAndFlush(success);
 									} else {
 										Element failure = new Element("failure", null, "urn:ietf:params:xml:ns:xmpp-sasl");
-
 										channel.writeAndFlush(failure);
 									}
+								} else {
+									Element failure = new Element("failure", null, "urn:ietf:params:xml:ns:xmpp-sasl");
+									channel.writeAndFlush(failure);
 								}
 							}
 						}
