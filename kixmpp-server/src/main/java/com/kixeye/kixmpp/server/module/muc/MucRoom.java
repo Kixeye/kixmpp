@@ -20,6 +20,7 @@ package com.kixeye.kixmpp.server.module.muc;
  * #L%
  */
 
+import com.google.common.collect.Maps;
 import io.netty.channel.Channel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -56,7 +57,7 @@ public class MucRoom {
     private Map<KixmppJid, MucAffiliation> jidAffiliations = new HashMap<>();
     
     private Map<KixmppJid, String> nicknamesByBareJid = new HashMap<>();
-    private Map<String, User> usersByNickname = new HashMap<>();
+    private Map<String, User> usersByNickname = Maps.newConcurrentMap();
     
     /**
      * @param service
