@@ -52,6 +52,7 @@ public class KixmppEventEngine {
 	private final ConcurrentHashMap<Tuple, Set<KixmppStanzaHandler>> stanzaHandlers = new ConcurrentHashMap<>();
 	private final Set<KixmppConnectionHandler> connectionHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppConnectionHandler, Boolean>());
 	private final Set<KixmppStreamHandler> streamHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppStreamHandler, Boolean>());
+	private final Set<KixmppSessionHandler> sessionHandlers = Collections.newSetFromMap(new ConcurrentHashMap<KixmppSessionHandler, Boolean>());
 
 	private final LoadingCache<String, DispatchQueue> queues = CacheBuilder.newBuilder()
 			.expireAfterAccess(30, TimeUnit.SECONDS)
@@ -234,7 +235,26 @@ public class KixmppEventEngine {
 			queue.execute(new ExecuteStreamEndHandler(handler, channel, streamEnd));
 		}
 	}
-	
+
+	/**
+	 * Publishes a session start event.
+	 *
+	 * @param channel
+	 */
+	public void publishSessionStart(Channel channel) {
+		DispatchQueue queue;
+
+		try {
+			queue = queues.get("channel:" + channel.hashCode());
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+
+		for (KixmppSessionHandler handler : sessionHandlers) {
+			queue.execute(new ExecuteSessionStartHandler(handler, channel));
+		}
+	}
+
 	/**
 	 * Registers a handler to listen to connection events.
 	 * 
@@ -252,23 +272,41 @@ public class KixmppEventEngine {
 	public void unregisterConnectionHandler(KixmppConnectionHandler handler) {
 		connectionHandlers.remove(handler);
 	}
-	
+
 	/**
 	 * Registers a stream handler.
-	 * 
+	 *
 	 * @param handler
 	 */
 	public void registerStreamHandler(KixmppStreamHandler handler) {
 		streamHandlers.add(handler);
 	}
-	
+
 	/**
 	 * Unregisters a stream handler.
-	 * 
+	 *
 	 * @param handler
 	 */
 	public void unregisterStreamHandler(KixmppStreamHandler handler) {
 		streamHandlers.remove(handler);
+	}
+
+	/**
+	 * Registers a session handler.
+	 *
+	 * @param handler
+	 */
+	public void registerSessionHandler(KixmppSessionHandler handler) {
+		sessionHandlers.add(handler);
+	}
+
+	/**
+	 * Unregisters a session handler.
+	 *
+	 * @param handler
+	 */
+	public void unregisterSessionHandler(KixmppSessionHandler handler) {
+		sessionHandlers.remove(handler);
 	}
 
 	/**
@@ -393,6 +431,7 @@ public class KixmppEventEngine {
 		stanzaHandlers.clear();
 		connectionHandlers.clear();
 		streamHandlers.clear();
+		sessionHandlers.clear();
 	}
 	
 	private static class ExecuteStanzaHandler extends Task {
@@ -468,6 +507,20 @@ public class KixmppEventEngine {
 
 		public void run() {
 			handler.handleStreamEnd(channel, end);
+		}
+	}
+
+	private static class ExecuteSessionStartHandler extends Task {
+		private final KixmppSessionHandler handler;
+		private final Channel channel;
+
+		public ExecuteSessionStartHandler(KixmppSessionHandler handler, Channel channel) {
+			this.handler = handler;
+			this.channel = channel;
+		}
+
+		public void run() {
+			handler.handleSessionStart(channel);
 		}
 	}
 }
