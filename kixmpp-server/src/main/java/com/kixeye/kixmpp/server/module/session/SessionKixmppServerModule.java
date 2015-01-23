@@ -20,6 +20,7 @@ package com.kixeye.kixmpp.server.module.session;
  * #L%
  */
 
+import com.kixeye.kixmpp.KixmppStreamStart;
 import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
 
@@ -96,6 +97,7 @@ public class SessionKixmppServerModule implements KixmppServerModule {
 				}
 				
 				channel.writeAndFlush(iq);
+				server.getEventEngine().publishSessionStart(channel);
 			}
 		}
 	};
