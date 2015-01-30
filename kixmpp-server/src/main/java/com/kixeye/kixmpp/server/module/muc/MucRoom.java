@@ -97,15 +97,15 @@ public class MucRoom {
         jidRoles.put(jid, role);
         jidAffiliations.put(jid, affiliation);
     }
-    
-    /**
-     * A user requets to join the room.
-     * @param channel
-     * @param nickname
-     */
-    public void join(Channel channel, String nickname) {
-    	join(channel, nickname, null);
-    }
+
+	/**
+	 * A user requets to join the room.
+	 * @param channel
+	 * @param nickname
+	 */
+	public void join(Channel channel, String nickname) {
+		join(channel, nickname, null);
+	}
 
     /**
      * A user requests to join the room.
@@ -345,21 +345,7 @@ public class MucRoom {
         }
     }
 
-    private Element createMessage(String id, KixmppJid from, KixmppJid to, String type, String bodyText) {
-        Element message = new Element("message");
 
-        message.setAttribute("to", to.getFullJid());
-        message.setAttribute("from", from.getFullJid());
-        message.setAttribute("type", type);
-        message.setAttribute("id", id);
-
-        Element body = new Element("body");
-        body.addContent(bodyText);
-
-        message.addContent(body);
-
-        return message;
-    }
 
 	private Element createPresence(KixmppJid from, KixmppJid to, MucRole role, String type) {
 		Element presence = new Element("presence");
@@ -427,31 +413,16 @@ public class MucRoom {
         
         mucModule.publishMessage(roomJid, fromRoomJid, fromNickname, messages);
 
-        for (User to : usersByNickname.values()) {
-            MucRole toRole = jidRoles.get(to.bareJid.withoutResource());
-            
-        	switch (toRole) {
-	        	case Participant:
-	        	case Moderator:
-	            	to.receiveMessages(fromRoomJid, messages);
-	            	break;
-	            default:
-	            	// TODO maybe send error?
-	            	break;
-        	}
-        }
-        
+		receive(fromRoomJid, messages);
+
         if (sendToCluster) {
             service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromRoomJid, fromNickname, messages), false);
         }
     }
 
-    public void receive(KixmppJid fromAddress, String nickname, String... messages) {
-        KixmppJid fromRoomJid = roomJid.withoutResource().withResource(nickname);
-        
-        for (User to : usersByNickname.values()) {
-            to.receiveMessages(fromRoomJid, messages);
-        }
+    public void receive(KixmppJid fromAddress, String... messages) {
+		MucRoomMessageHandler mucRoomMessageHandler = service.getServer().getMucRoomMessageHandler();
+		mucRoomMessageHandler.handleMessage(jidRoles, fromAddress, MucRoom.this, messages);
     }
 
     /**
@@ -578,19 +549,6 @@ public class MucRoom {
             return bareJid;
         }
 
-        public void receiveMessages(KixmppJid fromAddress, String... messages) {
-            for (Client client : clientsByAddress.values()) {
-                for (String message : messages) {
-                    Element stanza = createMessage(UUID.randomUUID().toString(),
-                            fromAddress,
-                            client.getAddress(),
-                            "groupchat",
-                            message);
-                    client.getChannel().writeAndFlush(stanza);
-                }
-            }
-        }
-
 	    public void receivePresence(User fromUser, MucRole role, String type) {
 		    for (Client client : clientsByAddress.values()) {
 			    Element presence = createPresence(roomJid.withResource(fromUser.getNickname()), client.getAddress(), role, type);
@@ -619,6 +577,8 @@ public class MucRoom {
             clientsByAddress.clear();
             clientsByChannel.clear();
         }
+
+
     }
 
 
