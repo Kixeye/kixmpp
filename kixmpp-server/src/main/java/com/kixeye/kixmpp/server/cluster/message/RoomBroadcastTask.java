@@ -42,7 +42,7 @@ public class RoomBroadcastTask extends RoomTask {
 
     @Override
     public void run() {
-        getRoom().receive(from, nickname, messages);
+        getRoom().receive(from, messages);
     }
 
 	/**
