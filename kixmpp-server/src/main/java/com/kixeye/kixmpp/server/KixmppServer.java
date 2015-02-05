@@ -19,9 +19,7 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 import com.kixeye.kixmpp.server.module.chat.ChatKixmppServerModule;
 import com.kixeye.kixmpp.server.module.disco.DiscoKixmppServerModule;
 import com.kixeye.kixmpp.server.module.features.FeaturesKixmppServerModule;
-import com.kixeye.kixmpp.server.module.muc.DefaultMucRoomMessageHandler;
-import com.kixeye.kixmpp.server.module.muc.MucKixmppServerModule;
-import com.kixeye.kixmpp.server.module.muc.MucRoomMessageHandler;
+import com.kixeye.kixmpp.server.module.muc.*;
 import com.kixeye.kixmpp.server.module.presence.PresenceKixmppServerModule;
 import com.kixeye.kixmpp.server.module.roster.RosterKixmppServerModule;
 import com.kixeye.kixmpp.server.module.session.SessionKixmppServerModule;
@@ -119,7 +117,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 	private final ConcurrentHashMap<KixmppJid, Channel> jidChannel = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<String, Set<Channel>> usernameChannel = new ConcurrentHashMap<>();
 	private final Striped<Lock> usernameChannelStripes = Striped.lock(Runtime.getRuntime().availableProcessors() * 4);
-	private MucRoomMessageHandler mucRoomMessageHandler = new DefaultMucRoomMessageHandler();
+	private MucRoomEventHandler mucRoomEventHandler = new DefaultMucRoomEventHandler();
 
     private static enum State {
 		STARTING,
@@ -141,12 +139,12 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		this(DEFAULT_SOCKET_ADDRESS, domain, DEFAULT_CLUSTER_ADDRESS, new ConstNodeDiscovery() );
 	}
 
-	public MucRoomMessageHandler getMucRoomMessageHandler() {
-		return mucRoomMessageHandler;
+	public MucRoomEventHandler getMucRoomEventHandler() {
+		return mucRoomEventHandler;
 	}
 
-	public void setMucRoomMessageHandler(MucRoomMessageHandler mucRoomMessageHandler) {
-		this.mucRoomMessageHandler = mucRoomMessageHandler;
+	public void setMucRoomMessageHandler(MucRoomEventHandler mucRoomEventHandler) {
+		this.mucRoomEventHandler = mucRoomEventHandler;
 	}
 	/**
 	 * Creates a new {@link KixmppServer} with the given ssl engine.
