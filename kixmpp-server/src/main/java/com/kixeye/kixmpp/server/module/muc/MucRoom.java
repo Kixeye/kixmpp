@@ -130,6 +130,10 @@ public class MucRoom {
         if (user == null) {
             user = new User(nickname, jid.withoutResource());
             usersByNickname.put(nickname, user);
+            MucRoomEventHandler handler = service.getServer().getMucRoomEventHandler();
+            if (handler != null) {
+                handler.userAdded(this, user);
+            }
             existingUser = false;
         }
 
@@ -226,7 +230,6 @@ public class MucRoom {
 		KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
 
 		for (User user : usersByNickname.values()) {
-
 
 			if (newUser.getBareJid().equals(user.getBareJid())) {
 				continue;
@@ -346,7 +349,6 @@ public class MucRoom {
     }
 
 
-
 	private Element createPresence(KixmppJid from, KixmppJid to, MucRole role, String type) {
 		Element presence = new Element("presence");
 
@@ -421,8 +423,10 @@ public class MucRoom {
     }
 
     public void receive(KixmppJid fromAddress, String... messages) {
-		MucRoomMessageHandler mucRoomMessageHandler = service.getServer().getMucRoomMessageHandler();
-		mucRoomMessageHandler.handleMessage(jidRoles, fromAddress, MucRoom.this, messages);
+        MucRoomEventHandler handler = service.getServer().getMucRoomEventHandler();
+        if (handler != null) {
+            handler.handleMessage(this, fromAddress, messages);
+        }
     }
 
     /**
@@ -474,12 +478,16 @@ public class MucRoom {
         return Lists.newArrayList(usersByNickname.values());
     }
 
-    public Collection<Client> getClients() {
-        List<Client> clients = Lists.newArrayList();
-        for (User user : usersByNickname.values()) {
-            clients.addAll(user.getConnections());
+    public User getUser(String nickname) {
+        return usersByNickname.get(nickname);
+    }
+
+    public User getUser(KixmppJid jid) {
+        String nickname = nicknamesByBareJid.get(jid.withoutResource());
+        if (nickname != null) {
+            return usersByNickname.get(nickname);
         }
-        return clients;
+        return null;
     }
 
     private class CloseChannelListener implements GenericFutureListener<Future<? super Void>> {
@@ -507,6 +515,10 @@ public class MucRoom {
 	        this.usersByNickname.remove(user.getNickname());
 	        this.jidAffiliations.remove(user.getBareJid());
 	        this.jidRoles.remove(user.getBareJid());
+            MucRoomEventHandler handler = service.getServer().getMucRoomEventHandler();
+            if (handler != null) {
+                handler.userRemoved(this, user);
+            }
         }
         if (usersByNickname.isEmpty()) {
             this.service.removeRoom(roomId);

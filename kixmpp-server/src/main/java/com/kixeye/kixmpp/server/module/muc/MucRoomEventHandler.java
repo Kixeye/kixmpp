@@ -1,4 +1,5 @@
 package com.kixeye.kixmpp.server.module.muc;
+
 /*
  * #%L
  * KIXMPP
@@ -18,10 +19,11 @@ package com.kixeye.kixmpp.server.module.muc;
  * limitations under the License.
  * #L%
  */
+
 import com.kixeye.kixmpp.KixmppJid;
 
-import java.util.Map;
-
-public interface MucRoomMessageHandler {
-	public void handleMessage(Map<KixmppJid, MucRole> jidRoles, KixmppJid fromAddress, MucRoom mucRoom, String... messages);
+public interface MucRoomEventHandler {
+	public void handleMessage(MucRoom room, KixmppJid from, String... messages);
+	public void userAdded(MucRoom room, MucRoom.User user);
+	public void userRemoved(MucRoom room, MucRoom.User user);
 }

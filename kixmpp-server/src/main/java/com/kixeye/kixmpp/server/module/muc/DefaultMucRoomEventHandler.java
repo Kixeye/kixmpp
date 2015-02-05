@@ -19,13 +19,13 @@ package com.kixeye.kixmpp.server.module.muc;
  * limitations under the License.
  * #L%
  */
+
 import com.kixeye.kixmpp.KixmppJid;
 import org.jdom2.Element;
 
-import java.util.Map;
 import java.util.UUID;
 
-public class DefaultMucRoomMessageHandler implements MucRoomMessageHandler{
+public class DefaultMucRoomEventHandler implements MucRoomEventHandler {
 
 	private Element createMessage(String id, KixmppJid from, KixmppJid to, String type, String bodyText) {
 		Element message = new Element("message");
@@ -44,16 +44,28 @@ public class DefaultMucRoomMessageHandler implements MucRoomMessageHandler{
 	}
 
 	@Override
-	public void handleMessage(Map<KixmppJid, MucRole> jidRoles, KixmppJid fromAddress, MucRoom mucRoom, String... messages) {
-		for (MucRoom.Client client : mucRoom.getClients()) {
-			for (String message : messages) {
-				Element stanza = createMessage(UUID.randomUUID().toString(),
-						fromAddress,
-						client.getAddress(),
-						"groupchat",
-						message);
-				client.getChannel().writeAndFlush(stanza);
+	public void handleMessage(MucRoom room, KixmppJid from, String... messages) {
+		for (MucRoom.User user: room.getUsers()) {
+			for (MucRoom.Client client: user.getConnections()) {
+				for (String message: messages) {
+					Element stanza = createMessage(UUID.randomUUID().toString(),
+							from,
+							client.getAddress(),
+							"groupchat",
+							message);
+					client.getChannel().writeAndFlush(stanza);
+				}
 			}
 		}
+	}
+
+	@Override
+	public void userAdded(MucRoom room, MucRoom.User user) {
+		//no-op
+	}
+
+	@Override
+	public void userRemoved(MucRoom room, MucRoom.User user) {
+		//no-op
 	}
 }

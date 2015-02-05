@@ -56,11 +56,11 @@ public class MucRoomTest {
         Mockito.when(channel.attr(BindKixmppServerModule.JID)).thenReturn(jidAttribute);
         Mockito.when(channel.closeFuture()).thenReturn(Mockito.mock(ChannelFuture.class));
 
-        Assert.assertEquals(0, mucRoom.getClients().size());
+        Assert.assertEquals(0, mucRoom.getUsers().size());
 
         mucRoom.join(channel, "nickname");
 
-        Assert.assertEquals(1, mucRoom.getClients().size());
+        Assert.assertEquals(1, mucRoom.getUsers().size());
     }
 
     @Test
@@ -80,11 +80,11 @@ public class MucRoomTest {
         Mockito.when(channel.attr(BindKixmppServerModule.JID)).thenReturn(jidAttribute);
         Mockito.when(channel.closeFuture()).thenReturn(Mockito.mock(ChannelFuture.class));
 
-        Assert.assertEquals(0, mucRoom.getClients().size());
+        Assert.assertEquals(0, mucRoom.getUsers().size());
 
         mucRoom.join(channel, "nickname");
 
-        Assert.assertEquals(1, mucRoom.getClients().size());
+        Assert.assertEquals(1, mucRoom.getUsers().size());
 
         Channel channel2 = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute2 = Mockito.mock(Attribute.class);
@@ -94,7 +94,8 @@ public class MucRoomTest {
 
         mucRoom.join(channel2, "nickname");
 
-        Assert.assertEquals(2, mucRoom.getClients().size());
+        Assert.assertEquals(1, mucRoom.getUsers().size());
+        Assert.assertEquals(2, mucRoom.getUser("nickname").getConnections().size());
     }
 
     @Test
@@ -113,11 +114,11 @@ public class MucRoomTest {
         Mockito.when(channel.attr(BindKixmppServerModule.JID)).thenReturn(jidAttribute);
         Mockito.when(channel.closeFuture()).thenReturn(Mockito.mock(ChannelFuture.class));
 
-        Assert.assertEquals(0, mucRoom.getClients().size());
+        Assert.assertEquals(0, mucRoom.getUsers().size());
 
         mucRoom.join(channel, "nickname");
 
-        Assert.assertEquals(1, mucRoom.getClients().size());
+        Assert.assertEquals(1, mucRoom.getUsers().size());
 
         Channel channel2 = Mockito.mock(Channel.class);
         Attribute<KixmppJid> jidAttribute2 = Mockito.mock(Attribute.class);
@@ -169,12 +170,12 @@ public class MucRoomTest {
         Mockito.when(channel.attr(BindKixmppServerModule.JID)).thenReturn(jidAttribute);
         Mockito.when(channel.closeFuture()).thenReturn(Mockito.mock(ChannelFuture.class));
 
-        Assert.assertEquals(0, mucRoom.getClients().size());
+        Assert.assertEquals(0, mucRoom.getUsers().size());
 
         mucRoom.addUser(new KixmppJid("test.user", "testdomain", "testresource"), "nickname", MucRole.Participant, MucAffiliation.Member);
         mucRoom.join(channel, "nickname");
 
-        Assert.assertEquals(1, mucRoom.getClients().size());
+        Assert.assertEquals(1, mucRoom.getUsers().size());
     }
 
     @Test
