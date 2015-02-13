@@ -415,7 +415,7 @@ public class MucRoom {
         
         mucModule.publishMessage(roomJid, fromRoomJid, fromNickname, messages);
 
-		receive(fromRoomJid, messages);
+		receive(fromAddress, messages);
 
         if (sendToCluster) {
             service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromRoomJid, fromNickname, messages), false);
@@ -481,6 +481,11 @@ public class MucRoom {
     public User getUser(String nickname) {
         return usersByNickname.get(nickname);
     }
+
+	public KixmppJid getRoomJidWithNickname(KixmppJid jid) {
+		String nickname = nicknamesByBareJid.get(jid.withoutResource());
+		return roomJid.withResource(nickname);
+	}
 
     public User getUser(KixmppJid jid) {
         String nickname = nicknamesByBareJid.get(jid.withoutResource());
