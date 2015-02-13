@@ -415,10 +415,13 @@ public class MucRoom {
         
         mucModule.publishMessage(roomJid, fromRoomJid, fromNickname, messages);
 
-		receive(fromAddress, messages);
+	    MucRoomEventHandler handler = service.getServer().getMucRoomEventHandler();
+	    if (handler != null) {
+		    handler.handleMessage(this, fromAddress, messages);
+	    }
 
         if (sendToCluster) {
-            service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromRoomJid, fromNickname, messages), false);
+            service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromAddress, fromNickname, messages), false);
         }
     }
 
