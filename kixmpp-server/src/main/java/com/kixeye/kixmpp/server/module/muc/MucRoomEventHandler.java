@@ -23,7 +23,7 @@ package com.kixeye.kixmpp.server.module.muc;
 import com.kixeye.kixmpp.KixmppJid;
 
 public interface MucRoomEventHandler {
-	public void handleMessage(MucRoom room, KixmppJid from, String... messages);
+	public void handleMessage(MucRoom room, KixmppJid sender, String... messages);
 	public void userAdded(MucRoom room, MucRoom.User user);
 	public void userRemoved(MucRoom room, MucRoom.User user);
 }

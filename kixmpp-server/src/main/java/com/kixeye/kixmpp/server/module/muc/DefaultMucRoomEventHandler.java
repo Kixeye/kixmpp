@@ -44,12 +44,13 @@ public class DefaultMucRoomEventHandler implements MucRoomEventHandler {
 	}
 
 	@Override
-	public void handleMessage(MucRoom room, KixmppJid from, String... messages) {
+	public void handleMessage(MucRoom room, KixmppJid sender, String... messages) {
+		KixmppJid fromRoomJid = room.getRoomJidWithNickname(sender);
 		for (MucRoom.User user: room.getUsers()) {
 			for (MucRoom.Client client: user.getConnections()) {
 				for (String message: messages) {
 					Element stanza = createMessage(UUID.randomUUID().toString(),
-							from,
+							fromRoomJid,
 							client.getAddress(),
 							"groupchat",
 							message);
