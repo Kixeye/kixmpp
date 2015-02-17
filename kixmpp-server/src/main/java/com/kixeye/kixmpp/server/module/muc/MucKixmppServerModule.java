@@ -184,7 +184,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 
 			KixmppJid roomJid = new KixmppJid(broadcastTask.getRoomId(), broadcastTask.getServiceSubDomain() + "." + server.getDomain());
 			
-			publishMessage(roomJid, broadcastTask.getFrom(), broadcastTask.getNickname(), broadcastTask.getMessages());
+			publishMessage(roomJid, broadcastTask.getFromRoomJid(), broadcastTask.getNickname(), broadcastTask.getMessages());
 		}
 		
         MucService service = getService(roomTask.getServiceSubDomain());

@@ -21,6 +21,7 @@ package com.kixeye.kixmpp.server.module.muc;
  */
 
 import com.google.common.collect.Maps;
+import com.kixeye.kixmpp.server.cluster.message.RoomBroadcastPresenceTask;
 import io.netty.channel.Channel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -245,12 +246,9 @@ public class MucRoom {
 	}
 
 	private void broadcastPresence(User fromUser, MucRole role, String type) {
-		for (User user : usersByNickname.values()) {
-			if (user.getBareJid().equals(fromUser.getBareJid())) {
-				continue;
-			}
-			user.receivePresence(fromUser, role, type);
-		}
+		KixmppJid fromJid = roomJid.withResource(fromUser.getNickname());
+		receivePresence(fromJid, role, type);
+		service.getServer().getCluster().sendMessageToAll(new RoomBroadcastPresenceTask(this, service.getSubDomain(), roomId, fromJid, role, type), false);
 	}
 
     private void checkForNicknameInUse(String nickname, KixmppJid jid) {
@@ -415,20 +413,28 @@ public class MucRoom {
         
         mucModule.publishMessage(roomJid, fromRoomJid, fromNickname, messages);
 
-		receive(fromRoomJid, messages);
+		receive(fromAddress, fromRoomJid, messages);
 
         if (sendToCluster) {
-            service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromRoomJid, fromNickname, messages), false);
+            service.getServer().getCluster().sendMessageToAll(new RoomBroadcastTask(this, service.getSubDomain(), roomId, fromAddress, fromRoomJid, fromNickname, messages), false);
         }
     }
 
-    public void receive(KixmppJid fromAddress, String... messages) {
+    public void receive(KixmppJid fromJid, KixmppJid fromRoomJid, String... messages) {
         MucRoomEventHandler handler = service.getServer().getMucRoomEventHandler();
         if (handler != null) {
-            handler.handleMessage(this, fromAddress, messages);
+            handler.handleMessage(this, fromJid, fromRoomJid, messages);
         }
     }
 
+	public void receivePresence(KixmppJid from, MucRole role, String type) {
+		for (User user : usersByNickname.values()) {
+			if (user.getBareJid().equals(from.withoutResource())) {
+				continue;
+			}
+			user.receivePresence(from, role, type);
+		}
+	}
     /**
      * Sends an direct invitation to a user.  Note: The smack client does not recognize this as a valid room invite.
      */
@@ -561,9 +567,9 @@ public class MucRoom {
             return bareJid;
         }
 
-	    public void receivePresence(User fromUser, MucRole role, String type) {
+	    public void receivePresence(KixmppJid fromJid, MucRole role, String type) {
 		    for (Client client : clientsByAddress.values()) {
-			    Element presence = createPresence(roomJid.withResource(fromUser.getNickname()), client.getAddress(), role, type);
+			    Element presence = createPresence(fromJid, client.getAddress(), role, type);
 			    client.getChannel().writeAndFlush(presence);
 		    }
 	    }
