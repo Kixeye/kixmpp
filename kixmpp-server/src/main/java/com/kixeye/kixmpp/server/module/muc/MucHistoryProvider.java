@@ -40,5 +40,5 @@ public interface MucHistoryProvider {
 	 * @param since
 	 * @return
 	 */
-	public List<MucHistory> getHistory(KixmppJid roomJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since);
+	public List<MucHistory> getHistory(KixmppJid roomJid, KixmppJid userJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since);
 }
