@@ -143,7 +143,7 @@ public class KixmppServer implements AutoCloseable, ClusterListener {
 		return mucRoomEventHandler;
 	}
 
-	public void setMucRoomMessageHandler(MucRoomEventHandler mucRoomEventHandler) {
+	public void setMucRoomEventHandler(MucRoomEventHandler mucRoomEventHandler) {
 		this.mucRoomEventHandler = mucRoomEventHandler;
 	}
 	/**
