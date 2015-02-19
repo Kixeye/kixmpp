@@ -196,7 +196,7 @@ public class MucRoom {
 
 					String since = history.getAttributeValue("since");
 
-					List<MucHistory> historyItems = historyProvider.getHistory(roomJid, maxChars, maxStanzas, seconds, since);
+					List<MucHistory> historyItems = historyProvider.getHistory(roomJid, user.getBareJid(), maxChars, maxStanzas, seconds, since);
 
 					if (historyItems != null) {
 						for (MucHistory historyItem : historyItems) {
