@@ -329,7 +329,7 @@ public class KixmppServerTest {
 			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
 			
 			server.module(MucKixmppServerModule.class).setHistoryProvider(new MucHistoryProvider() {
-				public List<MucHistory> getHistory(KixmppJid roomJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
+				public List<MucHistory> getHistory(KixmppJid roomJid, KixmppJid userJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
 					List<MucHistory> history = new ArrayList<>(maxStanzas);
 					
 					for (int i = 0; i < maxStanzas; i++) {

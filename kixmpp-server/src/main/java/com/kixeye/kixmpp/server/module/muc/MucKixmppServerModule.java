@@ -54,7 +54,7 @@ public class MucKixmppServerModule implements KixmppServerModule {
 		private final List<MucHistory> emptyList = Collections.unmodifiableList(new ArrayList<MucHistory>(0));
 		
 		@Override
-		public List<MucHistory> getHistory(KixmppJid roomJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
+		public List<MucHistory> getHistory(KixmppJid roomJid, KixmppJid userJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
 			return emptyList;
 		}
 	};
