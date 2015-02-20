@@ -21,16 +21,15 @@ package com.kixeye.kixmpp.server.module.muc;
  */
 
 import com.google.common.collect.Maps;
+import com.kixeye.kixmpp.server.cluster.message.GetMucRoomNicknamesRequest;
+import com.kixeye.kixmpp.server.cluster.message.RoomPresenceBroadcastTask;
 import io.netty.channel.Channel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
+import io.netty.util.concurrent.Promise;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 
@@ -141,14 +140,15 @@ public class MucRoom {
 
         // xep-0045 7.2.3 begin
         // self presence
-        channel.writeAndFlush(createPresence(roomJid.withResource(nickname), jid, MucRole.Participant, null));
+	    KixmppJid fromRoomJid = roomJid.withResource(nickname);
+        channel.writeAndFlush(createPresence(fromRoomJid, jid, MucRole.Participant, null));
 
         if (settings.isPresenceEnabled() && !existingUser) {
             // Send presence from existing occupants to new occupant
             sendExistingOccupantsPresenceToNewOccupant(user, channel);
 
             // Send new occupant's presence to all occupants
-            broadcastPresence(user, MucRole.Participant, null);
+            broadcastPresence(fromRoomJid, MucRole.Participant, null);
         }
         // xep-0045 7.2.3 end
 
@@ -226,30 +226,47 @@ public class MucRoom {
         channel.closeFuture().addListener(new CloseChannelListener(client));
     }
 
-	private void sendExistingOccupantsPresenceToNewOccupant(User newUser, Channel channel) {
-		KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
+	private void sendExistingOccupantsPresenceToNewOccupant(final User newUser, final Channel channel) {
 
-		for (User user : usersByNickname.values()) {
+		final KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
+		final MucRole role = jidRoles.get(jid.withoutResource());
 
-			if (newUser.getBareJid().equals(user.getBareJid())) {
-				continue;
+		Promise<Set<String>> promise = service.getServer().createPromise();
+		promise.addListener(new GenericFutureListener<Future<Set<String>>>() {
+			@Override
+			public void operationComplete(Future<Set<String>> future) throws Exception {
+				if (future.isSuccess()) {
+					Set<String> nicknames = future.get();
+					for (String nickname : nicknames) {
+
+						if (newUser.getNickname().equals(nickname)) {
+							continue;
+						}
+
+						Element presence = createPresence(roomJid.withResource(nickname), jid, role, null);
+						channel.write(presence);
+					}
+					if (!nicknames.isEmpty()) {
+						channel.flush();
+					}
+				}
 			}
-
-			MucRole role = jidRoles.get(jid.withoutResource());
-			Element presence = createPresence(roomJid.withResource(user.getNickname()), jid, role, null);
-			channel.write(presence);
-		}
-		if (!usersByNickname.isEmpty()) {
-			channel.flush();
-		}
+		});
+		service.getServer().sendMapReduceRequest(new GetMucRoomNicknamesRequest(service.getSubDomain(), roomId, jid, promise));
 	}
 
-	private void broadcastPresence(User fromUser, MucRole role, String type) {
+	private void broadcastPresence(KixmppJid fromRoomJid, MucRole role, String type) {
+		receivePresence(fromRoomJid, role, type);
+		service.getServer().getCluster().sendMessageToAll(new RoomPresenceBroadcastTask(this, service.getSubDomain(), roomId, fromRoomJid, role, type), false);
+	}
+
+	public void receivePresence(KixmppJid fromRoomJid, MucRole role, String type) {
+		String nickname = fromRoomJid.getResource();
 		for (User user : usersByNickname.values()) {
-			if (user.getBareJid().equals(fromUser.getBareJid())) {
+			if (user.getNickname().equals(nickname)) {
 				continue;
 			}
-			user.receivePresence(fromUser, role, type);
+			user.receivePresence(fromRoomJid, role, type);
 		}
 	}
 
@@ -474,7 +491,7 @@ public class MucRoom {
         userChannelToInvite.writeAndFlush(message);
     }
 
-    public Collection<User> getUsers() {
+    public List<User> getUsers() {
         return Lists.newArrayList(usersByNickname.values());
     }
 
@@ -510,7 +527,7 @@ public class MucRoom {
 	        MucRole role = jidRoles.get(user.getBareJid());
 
 	        if (settings.isPresenceEnabled()) {
-		        broadcastPresence(user, role, "unavailable");
+		        broadcastPresence(user.getBareJid(), role, "unavailable");
 	        }
 	        this.usersByNickname.remove(user.getNickname());
 	        this.jidAffiliations.remove(user.getBareJid());
@@ -561,9 +578,9 @@ public class MucRoom {
             return bareJid;
         }
 
-	    public void receivePresence(User fromUser, MucRole role, String type) {
+	    public void receivePresence(KixmppJid fromRoomJid, MucRole role, String type) {
 		    for (Client client : clientsByAddress.values()) {
-			    Element presence = createPresence(roomJid.withResource(fromUser.getNickname()), client.getAddress(), role, type);
+			    Element presence = createPresence(fromRoomJid, client.getAddress(), role, type);
 			    client.getChannel().writeAndFlush(presence);
 		    }
 	    }
