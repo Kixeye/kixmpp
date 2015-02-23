@@ -527,7 +527,7 @@ public class MucRoom {
 	        MucRole role = jidRoles.get(user.getBareJid());
 
 	        if (settings.isPresenceEnabled()) {
-		        broadcastPresence(user.getBareJid(), role, "unavailable");
+		        broadcastPresence(roomJid.withResource(user.getNickname()), role, "unavailable");
 	        }
 	        this.usersByNickname.remove(user.getNickname());
 	        this.jidAffiliations.remove(user.getBareJid());
