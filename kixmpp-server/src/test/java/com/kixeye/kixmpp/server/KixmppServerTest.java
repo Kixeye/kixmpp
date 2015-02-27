@@ -29,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import io.netty.util.concurrent.Promise;
 import org.jivesoftware.smack.ConnectionConfiguration;
 import org.jivesoftware.smack.PacketListener;
 import org.jivesoftware.smack.SmackException.NotConnectedException;
@@ -329,15 +330,17 @@ public class KixmppServerTest {
 			server.module(MucKixmppServerModule.class).addService("conference").addRoom("someRoom");
 			
 			server.module(MucKixmppServerModule.class).setHistoryProvider(new MucHistoryProvider() {
-				public List<MucHistory> getHistory(KixmppJid roomJid, KixmppJid userJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
+				public Promise<List<MucHistory>> getHistory(KixmppJid roomJid, KixmppJid userJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
+					Promise<List<MucHistory>> promise = server.createPromise();
 					List<MucHistory> history = new ArrayList<>(maxStanzas);
 					
 					for (int i = 0; i < maxStanzas; i++) {
 						history.add(new MucHistory(KixmppJid.fromRawJid("user" + i + "@" + server.getDomain() + "/computer"), roomJid, 
 								"nick" + i, "message" + i, System.currentTimeMillis()));
 					}
-					
-					return history;
+
+					promise.setSuccess(history);
+					return promise;
 				}
 			});
 

@@ -27,7 +27,7 @@ import com.kixeye.kixmpp.KixmppJid;
  * 
  * @author ebahtijaragic
  */
-public class MucHistory {
+public class MucHistory implements Comparable<MucHistory> {
 	private final KixmppJid from;
 	private final KixmppJid to;
 	private final String nickname;
@@ -83,5 +83,12 @@ public class MucHistory {
 	 */
 	public long getTimestamp() {
 		return timestamp;
+	}
+
+	@Override
+	public int compareTo(MucHistory otherMucHistory) {
+		Long timeStamp1 = this.getTimestamp();
+		Long timeStamp2 = otherMucHistory.getTimestamp();
+		return timeStamp1.compareTo(timeStamp2);
 	}
 }

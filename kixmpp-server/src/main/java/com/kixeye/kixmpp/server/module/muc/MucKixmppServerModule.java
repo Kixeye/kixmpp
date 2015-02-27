@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import io.netty.util.concurrent.Promise;
 import org.fusesource.hawtdispatch.Task;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
@@ -50,22 +51,22 @@ import com.kixeye.kixmpp.server.module.bind.BindKixmppServerModule;
 public class MucKixmppServerModule implements KixmppServerModule {
 	private static final Logger logger = LoggerFactory.getLogger(MucKixmppServerModule.class);
 	
-	public static final MucHistoryProvider NOOP_HISTORY_PROVIDER = new MucHistoryProvider() {
-		private final List<MucHistory> emptyList = Collections.unmodifiableList(new ArrayList<MucHistory>(0));
-		
-		@Override
-		public List<MucHistory> getHistory(KixmppJid roomJid, KixmppJid userJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
-			return emptyList;
-		}
-	};
-
 	private Set<MucRoomMessageListener> messageListeners = Collections.newSetFromMap(new ConcurrentHashMap<MucRoomMessageListener, Boolean>());
 
 	private KixmppServer server;
 	
 	private ConcurrentHashMap<String, MucService> services = new ConcurrentHashMap<>();
 	
-	private MucHistoryProvider historyProvider = NOOP_HISTORY_PROVIDER;
+	private MucHistoryProvider historyProvider = new MucHistoryProvider() {
+		private final List<MucHistory> emptyList = Collections.unmodifiableList(new ArrayList<MucHistory>(0));
+
+		@Override
+		public Promise<List<MucHistory>> getHistory(KixmppJid roomJid, KixmppJid userJid, Integer maxChars, Integer maxStanzas, Integer seconds, String since) {
+			Promise<List<MucHistory>> promise = server.createPromise();
+			promise.setSuccess(emptyList);
+			return promise;
+		}
+	};
 	
 	/**
 	 * @see com.kixeye.kixmpp.server.module.KixmppModule#install(com.kixeye.kixmpp.server.KixmppServer)
