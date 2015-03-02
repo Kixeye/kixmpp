@@ -113,7 +113,7 @@ public class MucRoom {
      * @param nickname
      * @param mucStanza
      */
-    public void join(Channel channel, String nickname, Element mucStanza) {
+    public void join(final Channel channel, String nickname, Element mucStanza) {
         KixmppJid jid = channel.attr(BindKixmppServerModule.JID).get();
 
         if (settings.isOpen() && !jidRoles.containsKey(jid.withoutResource())) {
@@ -196,29 +196,35 @@ public class MucRoom {
 
 					String since = history.getAttributeValue("since");
 
-					List<MucHistory> historyItems = historyProvider.getHistory(roomJid, user.getBareJid(), maxChars, maxStanzas, seconds, since);
+					historyProvider.getHistory(roomJid, user.getBareJid(), maxChars, maxStanzas, seconds, since).addListener(new GenericFutureListener<Future<List<MucHistory>>>() {
+						@Override
+						public void operationComplete(Future<List<MucHistory>> future) throws Exception {
+							if (future.isSuccess()) {
+								List<MucHistory> historyItems = future.get();
+								if (historyItems != null) {
+									for (MucHistory historyItem : historyItems) {
+										Element message = new Element("message")
+												.setAttribute("id", UUID.randomUUID().toString())
+												.setAttribute("from", roomJid.withResource(historyItem.getNickname()).toString())
+												.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString())
+												.setAttribute("type", "groupchat");
+										message.addContent(new Element("body").setText(historyItem.getBody()));
 
-					if (historyItems != null) {
-						for (MucHistory historyItem : historyItems) {
-							Element message = new Element("message")
-								.setAttribute("id", UUID.randomUUID().toString())
-								.setAttribute("from", roomJid.withResource(historyItem.getNickname()).toString())
-								.setAttribute("to", channel.attr(BindKixmppServerModule.JID).get().toString())
-								.setAttribute("type", "groupchat");
-							message.addContent(new Element("body").setText(historyItem.getBody()));
+										Element addresses = new Element("addresses", Namespace.getNamespace("http://jabber.org/protocol/address"));
+										addresses.addContent(new Element("address", addresses.getNamespace()).setAttribute("type", "ofrom").setAttribute("jid", historyItem.getFrom().toString()));
+										message.addContent(addresses);
 
-							Element addresses = new Element("addresses", Namespace.getNamespace("http://jabber.org/protocol/address"));
-							addresses.addContent(new Element("address", addresses.getNamespace()).setAttribute("type", "ofrom").setAttribute("jid", historyItem.getFrom().toString()));
-							message.addContent(addresses);
+										message.addContent(new Element("delay", Namespace.getNamespace("urn:xmpp:delay"))
+												.setAttribute("from", roomJid.toString())
+												.setAttribute("stamp", XmppDateUtils.format(historyItem.getTimestamp())));
 
-							message.addContent(new Element("delay", Namespace.getNamespace("urn:xmpp:delay"))
-									.setAttribute("from", roomJid.toString())
-									.setAttribute("stamp", XmppDateUtils.format(historyItem.getTimestamp())));
-
-							channel.write(message);
+										channel.write(message);
+									}
+									channel.flush();
+								}
+							}
 						}
-						channel.flush();
-					}
+					});
 				}
         	}
         }
@@ -430,7 +436,7 @@ public class MucRoom {
         //TODO validate fromAddress is roomJid or is a member of the room
         KixmppJid fromRoomJid = roomJid.withResource(fromNickname);
         
-        mucModule.publishMessage(roomJid, fromRoomJid, fromNickname, messages);
+        mucModule.publishMessage(fromRoomJid, fromAddress, fromNickname, messages);
 
 		receive(fromAddress, fromRoomJid, messages);
 
